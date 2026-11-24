@@ -687,7 +687,10 @@ local function runGroundStalkSystem()
 		if scanClock >= GROUND_STALK_SCAN_INTERVAL then
 			scanClock = 0
 
-			if now - lastGroundStalkSpawn >= GROUND_STALK_SPAWN_COOLDOWN
+			-- Player-reactive ground vines are a mature-infection feature.
+			-- Keep the seed and developing bulb phases visually quiet.
+			if growthStage >= 3
+				and now - lastGroundStalkSpawn >= GROUND_STALK_SPAWN_COOLDOWN
 				and #groundStalks < MAX_GROUND_STALKS then
 
 				for _, anchor in ipairs(groundAnchors) do
@@ -952,7 +955,11 @@ local function createSpawnerBulb(surfacePosition, surfaceNormal)
 	bulb.Parent = infectionFolder
 
 	local targetSize = Vector3.new(1.25, 1.25, 1.25)
-	local targetCFrame = bulb.CFrame + surfaceNormal.Unit * 1.75
+	-- Keep the bulb resting against the surface as it grows instead of
+	-- lifting its center far away and making it look like it is floating.
+	local targetCFrame = CFrame.new(
+		surfacePosition + surfaceNormal.Unit * (targetSize.Y * 0.48)
+	)
 
 	TweenService:Create(
 		spawner,
