@@ -3485,7 +3485,7 @@ local function formStageFiveNest()
           local drift = Vector3.zero
           if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.3) end
           if segmentIndex == 4 then drift = Vector3.new(0, 0, -0.3) end
-          local target = base + direction * (distance * alpha) + drift
+          local target = surfaceBase + direction * (distance * alpha) + drift
           local probe = Vector3.new(target.X, previous.Y + 4, target.Z)
           local ground = workspace:Raycast(probe, Vector3.new(0, -60, 0), floorParams)
           local nextPoint
