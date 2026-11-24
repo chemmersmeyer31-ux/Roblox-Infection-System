@@ -67,6 +67,7 @@ local ceilingVines = {}
 local groundStalks = {}
 
 local activeGrabCount = 0
+local infectionGrowthBoosts = 0
 local lastGroundStalkSpawn = 0
 local infectedPlayers = {}
 
@@ -1212,6 +1213,14 @@ growBranch = function(position, normal, direction, steps, depth)
 
 		local settings = ({[1]={0.65,1.05,4.6,0.035,1},[2]={0.9,1.45,3.0,0.16,2},[3]={MIN_LENGTH,MAX_LENGTH,GROWTH_DELAY,BRANCH_CHANCE,MAX_BRANCH_DEPTH},[5]={MIN_LENGTH,MAX_LENGTH,1.35,0.48,6}})[growthStage]
 		if not settings then return end
+
+		-- Each successful infection feeds the colony. Early stages become
+		-- noticeably more active without skipping the timed stage progression.
+		if infectionGrowthBoosts > 0 and growthStage == 1 then
+			settings = {0.8, 1.2, 2.9, 0.12, 2}
+		elseif infectionGrowthBoosts > 0 and growthStage == 2 then
+			settings = {1.0, 1.55, 2.4, 0.22, 3}
+		end
 		local stepLength = rng:NextNumber(settings[1], settings[2])
 		local thickness = getThickness(depth)
 
@@ -2527,6 +2536,40 @@ end
 -- PLAYER CAPTURE SEQUENCE
 --------------------------------------------------
 
+local function rewardSuccessfulInfection(anchor)
+	if growthStage < 1 or growthStage > 3 then return end
+
+	infectionGrowthBoosts += 1
+	print("[INFECTION] Successful infection! The colony is feeding and expanding.")
+
+	-- A small growth burst spreads outward from the capture site. The normal
+	-- stage timer still controls when the parasite evolves to its next stage.
+	local origin = anchor.position
+	local normal = anchor.normal or Vector3.new(0, 1, 0)
+	local branchCount = math.min(3 + infectionGrowthBoosts, 6)
+
+	for index = 1, branchCount do
+		local angle = (index - 1) * (math.pi * 2 / branchCount)
+		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		direction = direction - normal * direction:Dot(normal)
+		if direction.Magnitude > 0.05 then
+			task.spawn(growBranch, origin, normal, direction.Unit, rng:NextInteger(9, 15), 0)
+		end
+	end
+
+	-- The central bulb also swells slightly with each successful feeding.
+	if infectionBulb and infectionBulb.Parent then
+		local baseSize = infectionStageBulbSize or infectionBulb.Size.X
+		local addedSize = math.min(infectionGrowthBoosts * 0.18, 0.9)
+		local targetSize = baseSize + addedSize
+		TweenService:Create(
+			infectionBulb,
+			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			{Size = Vector3.new(targetSize, targetSize, targetSize)}
+		):Play()
+	end
+end
+
 attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 	if infectedPlayers[player] then return end
 	if activeGrabCount >= MAX_ACTIVE_GRABS or anchor.used then return end
@@ -2758,7 +2801,7 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 				JumpingEnabled = wasJumpingEnabled
 			}
 
-			performInfectedDescent(
+			local infectionSucceeded = performInfectedDescent(
 				player,
 				character,
 				root,
@@ -2769,6 +2812,10 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 				roofResult,
 				restoreState
 			)
+
+			if infectionSucceeded then
+				rewardSuccessfulInfection(anchor)
+			end
 		end
 	end
 
