@@ -71,9 +71,9 @@ local groundStalks = {}
 
 local activeGrabCount = 0
 local infectionGrowthBoosts = 0
-local GROWTH_BOOST_MULTIPLIER = 3
-local GROWTH_BOOST_DURATION = 30
-local GROWTH_BOOST_COOLDOWN = 12
+local GROWTH_BOOST_MULTIPLIER = 7
+local GROWTH_BOOST_DURATION = 40
+local GROWTH_BOOST_COOLDOWN = 8
 local growthBoostUntil = 0
 local lastGrowthBoostAt = -math.huge
 local lastGroundStalkSpawn = 0
@@ -3533,7 +3533,7 @@ local function runGrowthBoostPartWatcher()
 			if now - lastGrowthBoostAt >= GROWTH_BOOST_COOLDOWN then
 				lastGrowthBoostAt = now
 				growthBoostUntil = now + GROWTH_BOOST_DURATION
-				print("[INFECTION] Growth accelerator touched! Growth speed tripled for 30 seconds.")
+				print("[INFECTION] Growth accelerator touched! Growth speed increased 7x for 40 seconds.")
 			end
 		end
 
