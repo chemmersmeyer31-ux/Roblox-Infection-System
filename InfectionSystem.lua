@@ -3031,17 +3031,25 @@ local function retractStageThreeTendrils()
 end
 
 local function makeWalkerLeg()
-	local part = Instance.new("Part")
-	part.Name = "Stage4WalkingTentacle"
-	part.Shape = Enum.PartType.Cylinder
-	part.Material = Enum.Material.CorrodedMetal
-	part.Color = Color3.fromRGB(72, 37, 29)
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.Parent = infectionFolder
-	return part
+	local function makeLimbPart(name, thickness)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Shape = Enum.PartType.Cylinder
+		part.Material = Enum.Material.CorrodedMetal
+		part.Color = Color3.fromRGB(72, 37, 29)
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false
+		part.Parent = infectionFolder
+		return part
+	end
+
+	-- Each leg has an upper and lower section so it bends at a visible knee.
+	return {
+		upper = makeLimbPart("Stage4LegUpper", 0.46),
+		lower = makeLimbPart("Stage4LegLower", 0.31)
+	}
 end
 
 local function crawlToNestTarget()
@@ -3152,7 +3160,8 @@ local function crawlToNestTarget()
 		print("[INFECTION] Stage 4: navmesh route unavailable; climbing the wall and passing through a clear window-height opening.")
 	end
 
-	-- Eight separate walking/climbing tentacles surround the bulb.
+	-- Eight articulated spider legs surround the bulb. Alternating groups
+	-- use opposite stride phases to create a recognizable crawling gait.
 	local legs = {}
 	for i = 1, 8 do
 		legs[i] = makeWalkerLeg()
@@ -3174,7 +3183,10 @@ local function crawlToNestTarget()
 
 		for step = 1, steps do
 			if not infectionBulb or not infectionBulb.Parent then
-				for _, leg in ipairs(legs) do if leg and leg.Parent then leg:Destroy() end end
+				for _, leg in ipairs(legs) do
+					if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
+					if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
+				end
 				return false
 			end
 
@@ -3190,27 +3202,43 @@ local function crawlToNestTarget()
 
 			for legIndex, leg in ipairs(legs) do
 				local angle = (legIndex - 1) * math.pi * 0.25
-				local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-				local hip = infectionBulb.Position + radial * 1.0 + Vector3.new(0, -0.2, 0)
-				local stride = math.sin(os.clock() * 8 + legIndex * math.pi * 0.5) * 0.42
+				local localRadial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+				local bodyFrame = infectionBulb.CFrame
+				local radial = bodyFrame:VectorToWorldSpace(localRadial)
+				radial = Vector3.new(radial.X, 0, radial.Z)
+				if radial.Magnitude < 0.05 then radial = localRadial end
+				radial = radial.Unit
+				local forward = bodyFrame.LookVector
+				forward = Vector3.new(forward.X, 0, forward.Z)
+				if forward.Magnitude < 0.05 then forward = Vector3.new(0, 0, -1) end
+				forward = forward.Unit
+
+				local phaseOffset = (legIndex % 2 == 0) and math.pi or 0
+				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * math.pi
+				local stride = math.sin(phase)
+				local lift = math.max(0, math.cos(phase)) * 0.62
+				local hip = infectionBulb.Position + radial * 0.92 + Vector3.new(0, -0.18, 0)
+				local knee
 				local foot
+
 				if mode == "climb" or mode == "window" then
-					-- During the wall section, the limbs reach around the bulb
-					-- and brace against the vertical surface instead of the floor.
-					local verticalReach = ((legIndex % 2 == 0) and 1 or -1) * 0.65
-					foot = hip + Vector3.new(
-						-radial.X * (1.0 + stride),
-						verticalReach + stride * 0.25,
-						-radial.Z * (1.0 + stride)
-					)
+					-- On the wall, legs fan outward and alternate their reach
+					-- vertically, keeping the body visibly braced against it.
+					local wallSide = (legIndex % 2 == 0) and 1 or -1
+					knee = hip + radial * 0.78 + Vector3.new(0, wallSide * 0.42, 0) + forward * stride * 0.22
+					foot = knee + radial * 0.72 + Vector3.new(0, wallSide * (0.48 + lift), 0)
 				else
-					foot = hip + Vector3.new(
-						radial.X * (1.15 + stride),
-						-bulbRadius + 0.05 + math.max(0, stride) * 0.3,
-						radial.Z * (1.15 + stride)
-					)
+					-- The knee bends outward; the foot lifts and reaches forward
+					-- on its swing, rather than each leg simply hanging down.
+					knee = hip + radial * 0.88 + Vector3.new(0, -0.38 + lift * 0.35, 0) + forward * stride * 0.42
+					foot = infectionBulb.Position
+						+ radial * (2.05 + stride * 0.48)
+						+ forward * (stride * 0.62)
+						+ Vector3.new(0, -bulbRadius + 0.06 + lift, 0)
 				end
-				setCylinderBetween(leg, hip, foot, 0.38)
+
+				setCylinderBetween(leg.upper, hip, knee, 0.43)
+				setCylinderBetween(leg.lower, knee, foot, 0.29)
 			end
 			task.wait(0.06)
 		end
@@ -3218,7 +3246,8 @@ local function crawlToNestTarget()
 	end
 
 	for _, leg in ipairs(legs) do
-		if leg and leg.Parent then leg:Destroy() end
+		if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
+		if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
 	end
 
 	local finalFloor = findFloor(target.Position)
@@ -3319,36 +3348,70 @@ local function formStageFiveNest()
 	local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
 
 	if isIndoors then
-		-- In the house, the single central bulb is lifted above the floor.
-		-- Use nearby walls/ceiling when available, with floor-reaching braces
-		-- as a reliable fallback so it never simply floats unsupported.
-		local attachmentCount = 0
-		for _, hit in ipairs(wallHits) do
-			growStageFiveVine("Stage5NestAttachmentTendril", raisedPosition, hit.Position, 0.48, rng:NextNumber(1.8, 2.8))
-			attachmentCount += 1
-			if attachmentCount >= 5 then break end
-			task.wait(rng:NextNumber(0.35, 0.65))
-		end
-		if ceilingHit then
-			task.wait(0.45)
-			growStageFiveVine("Stage5NestCeilingTendril", raisedPosition, ceilingHit.Position, 0.52, 2.2)
-			attachmentCount += 1
-		end
-		if attachmentCount == 0 then
-			for index = 1, 4 do
-				local angle = (index - 1) * math.pi * 0.5
-				local foot = groundPosition + Vector3.new(
-					math.cos(angle) * 2.2, 0, math.sin(angle) * 2.2
-				)
-				growStageFiveVine("Stage5NestSupportTendril", raisedPosition, foot, 0.5, 1.8)
-				task.wait(0.45)
+		-- Four optional wall markers give precise attachment locations.
+		-- Name them InfectionNestAnchor1 through InfectionNestAnchor4.
+		local markerHits = {}
+		for index = 1, 4 do
+			local marker = workspace:FindFirstChild("InfectionNestAnchor" .. index, true)
+			if marker and marker:IsA("BasePart") then
+				table.insert(markerHits, {Position = marker.Position, Instance = marker})
 			end
 		end
-		TweenService:Create(
-			infectionBulb,
-			TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
-		):Play()
+
+		-- If markers are not supplied, use nearby solid walls as a fallback.
+		local attachmentPoints = {}
+		if #markerHits >= 2 then
+			for _, markerHit in ipairs(markerHits) do
+				table.insert(attachmentPoints, markerHit.Position)
+			end
+		else
+			for _, hit in ipairs(wallHits) do
+				table.insert(attachmentPoints, hit.Position)
+				if #attachmentPoints >= 4 then break end
+			end
+		end
+
+		-- Do not raise the core unless it has at least two real wall anchors.
+		-- This prevents the old unsupported floating-core appearance.
+		if #attachmentPoints >= 2 then
+			local attachmentCount = math.min(#attachmentPoints, 4)
+			for index = 1, attachmentCount do
+				local wallPoint = attachmentPoints[index]
+				-- Grow from the wall inward and upward, finishing at the core.
+				-- The final end of each tendril visibly meets the raised bulb.
+				growStageFiveVine(
+					"Stage5WallToCoreTendril",
+					wallPoint,
+					raisedPosition,
+					0.62,
+					rng:NextNumber(2.8, 3.8)
+				)
+				task.wait(rng:NextNumber(0.45, 0.7))
+			end
+
+			if ceilingHit and attachmentCount < 4 then
+				task.wait(0.45)
+				growStageFiveVine("Stage5NestCeilingTendril", ceilingHit.Position, raisedPosition, 0.58, 2.8)
+			end
+
+			-- The core only rises after the wall vines have begun growing,
+			-- so it appears to be pulled up by the tendrils.
+			task.wait(0.8)
+			TweenService:Create(
+				infectionBulb,
+				TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
+			):Play()
+		else
+			-- No usable wall anchors: stay grounded rather than floating on
+			-- four short decorative legs.
+			warn("[INFECTION] Fewer than two wall anchors found; keeping the Stage 5 core grounded. Add four InfectionNestAnchor parts to suspend it.")
+			TweenService:Create(
+				infectionBulb,
+				TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+				{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
+			):Play()
+		end
 	else
 		-- Outdoors, keep the central bulb close to the ground.
 		for index = 1, 4 do
