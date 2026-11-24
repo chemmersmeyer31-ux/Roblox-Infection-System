@@ -3097,7 +3097,8 @@ local function crawlToNestTarget()
 	end
 
 	local path = PathfindingService:CreatePath({
-		AgentRadius = 2,
+		-- Give the 4.3-stud bulb a little extra clearance through doorways.
+		AgentRadius = 2.25,
 		AgentHeight = 4,
 		AgentCanJump = true,
 		WaypointSpacing = 3
@@ -3358,17 +3359,32 @@ local function formStageFiveNest()
 			end
 		end
 
-		-- If markers are not supplied, use nearby solid walls as a fallback.
+		-- Keep attachment points visually separated. Two markers can
+		-- accidentally be placed at nearly the same spot, which makes two
+		-- large tendrils overlap and look like a single doubled-up anchor.
 		local attachmentPoints = {}
-		if #markerHits >= 2 then
-			for _, markerHit in ipairs(markerHits) do
-				table.insert(attachmentPoints, markerHit.Position)
+		local MIN_ANCHOR_SPACING = 4.5
+
+		local function addUniqueAttachmentPoint(position)
+			for _, existingPoint in ipairs(attachmentPoints) do
+				if (existingPoint - position).Magnitude < MIN_ANCHOR_SPACING then
+					return false
+				end
 			end
-		else
-			for _, hit in ipairs(wallHits) do
-				table.insert(attachmentPoints, hit.Position)
-				if #attachmentPoints >= 4 then break end
-			end
+			table.insert(attachmentPoints, position)
+			return true
+		end
+
+		-- Prefer the user's marker parts, preserving their chosen locations.
+		for _, markerHit in ipairs(markerHits) do
+			addUniqueAttachmentPoint(markerHit.Position)
+		end
+
+		-- If markers overlap or there are too few of them, fill the remaining
+		-- slots with distinct nearby wall hits instead of stacking tendrils.
+		for _, hit in ipairs(wallHits) do
+			if #attachmentPoints >= 4 then break end
+			addUniqueAttachmentPoint(hit.Position)
 		end
 
 		-- Do not raise the core unless it has at least two real wall anchors.
