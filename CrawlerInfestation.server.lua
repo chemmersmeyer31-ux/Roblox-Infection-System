@@ -667,9 +667,18 @@ while script.Parent do
 
         lastHatch = os.clock()
         local angle = rng:NextNumber(0, math.pi * 2)
-        local radius = rng:NextNumber(3, 9)
+        local radius = rng:NextNumber(2, 4.5)
         local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-        local hatchPosition, hatchNormal = findGround(infectionSpawner.Position + offset)
+        local spawnOrigin = infectionSpawner.Position
+        if current == 5 then
+            local pointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
+            local points = pointsFolder and pointsFolder:GetChildren() or {}
+            local point = #points > 0 and points[rng:NextInteger(1, #points)] or nil
+            if point and point:IsA("BasePart") then
+                spawnOrigin = point.Position
+            end
+        end
+        local hatchPosition, hatchNormal = findGround(spawnOrigin + offset)
         task.spawn(hatchBulb, hatchPosition, hatchNormal)
     end
 
