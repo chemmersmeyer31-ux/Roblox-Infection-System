@@ -4,6 +4,7 @@
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local ServerStorage = game:GetService("ServerStorage")
 
 local rng = Random.new()
 
@@ -2104,25 +2105,135 @@ end
 --------------------------------------------------
 
 local function hideOriginalCharacter(character)
+	local savedVisuals = {}
+
 	for _, descendant in ipairs(character:GetDescendants()) do
 		if descendant:IsA("BasePart") then
+			savedVisuals[descendant] = {
+				Transparency = descendant.Transparency,
+				CastShadow = descendant.CastShadow
+			}
 			descendant.Transparency = 1
 			descendant.CastShadow = false
 
-		elseif descendant:IsA("Decal")
-			or descendant:IsA("Texture") then
+		elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+			savedVisuals[descendant] = {
+				Transparency = descendant.Transparency
+			}
 			descendant.Transparency = 1
 
 		elseif descendant:IsA("ParticleEmitter")
 			or descendant:IsA("Trail")
-			or descendant:IsA("Beam") then
-			descendant.Enabled = false
-
-		elseif descendant:IsA("BillboardGui")
+			or descendant:IsA("Beam")
+			or descendant:IsA("BillboardGui")
 			or descendant:IsA("SurfaceGui") then
+			savedVisuals[descendant] = {
+				Enabled = descendant.Enabled
+			}
 			descendant.Enabled = false
 		end
 	end
+
+	return savedVisuals
+end
+
+local function restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
+	if savedVisuals then
+		for instance, properties in pairs(savedVisuals) do
+			if instance and instance.Parent then
+				for property, value in pairs(properties) do
+					pcall(function()
+						instance[property] = value
+					end)
+				end
+			end
+		end
+	end
+
+	if humanoid and humanoid.Parent and restoreState then
+		humanoid.WalkSpeed = restoreState.WalkSpeed
+		humanoid.AutoRotate = restoreState.AutoRotate
+		humanoid.UseJumpPower = restoreState.UseJumpPower
+		humanoid.JumpPower = restoreState.JumpPower
+		humanoid.JumpHeight = restoreState.JumpHeight
+		humanoid:SetStateEnabled(
+			Enum.HumanoidStateType.Jumping,
+			restoreState.JumpingEnabled
+		)
+	end
+
+	if root and root.Parent and restoreState then
+		root.Anchored = restoreState.RootAnchored
+	end
+
+	local animateScript = character and character:FindFirstChild("Animate")
+	if animateScript then
+		animateScript.Disabled = false
+	end
+end
+
+local function prepareInfectedCharacter()
+	local template = ServerStorage:FindFirstChild("InfectedCharacter")
+	if not template or not template:IsA("Model") then
+		warn("[INFECTION] Transformation cancelled: ServerStorage.InfectedCharacter model was not found.")
+		return nil
+	end
+
+	local clone = template:Clone()
+	local infectedHumanoid = clone:FindFirstChildOfClass("Humanoid")
+	local infectedRoot = clone:FindFirstChild("HumanoidRootPart")
+
+	if not infectedHumanoid or not infectedRoot or not infectedRoot:IsA("BasePart") then
+		warn("[INFECTION] Transformation cancelled: InfectedCharacter needs a Humanoid and a BasePart named HumanoidRootPart.")
+		clone:Destroy()
+		return nil
+	end
+
+	clone.PrimaryPart = infectedRoot
+	return clone
+end
+
+local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, targetCFrame)
+	if not player or not player.Parent then
+		return false
+	end
+
+	local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
+	local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
+
+	if not infectedRoot or not infectedHumanoid then
+		return false
+	end
+
+	infectedCharacter.Name = player.Name
+	infectedCharacter:PivotTo(targetCFrame)
+	infectedCharacter.Parent = workspace
+
+	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = false
+		end
+	end
+
+	local assigned, assignmentError = pcall(function()
+		player.Character = infectedCharacter
+	end)
+
+	if not assigned or player.Character ~= infectedCharacter then
+		warn("[INFECTION] Character assignment failed: " .. tostring(assignmentError))
+		infectedCharacter:Destroy()
+		return false
+	end
+
+	pcall(function()
+		infectedRoot:SetNetworkOwner(player)
+	end)
+
+	if oldCharacter and oldCharacter.Parent then
+		oldCharacter:Destroy()
+	end
+
+	return true
 end
 
 --------------------------------------------------
@@ -2241,9 +2352,18 @@ local function performInfectedDescent(
 	finalEntanglement,
 	outerLayer,
 	hoistVines,
-	roofResult
+	roofResult,
+	restoreState
 )
 	print("[INFECTION] Cocoon holding captured player.")
+
+	-- Prepare and validate the replacement before hiding the player's avatar.
+	-- If the model is missing or incorrectly rigged, the original character is restored.
+	local infectedCharacter = prepareInfectedCharacter()
+	if not infectedCharacter then
+		restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
+		return false
+	end
 
 	-- Keep the cocoon closed for a few seconds.
 	local hangStart = os.clock()
@@ -2285,7 +2405,7 @@ local function performInfectedDescent(
 
 	-- Hide the original avatar so the placeholder becomes the
 	-- reference for the future infected character model.
-	hideOriginalCharacter(character)
+	local savedVisuals = hideOriginalCharacter(character)
 
 	-- Keep the real player safely anchored and hidden.
 	root.Anchored = true
@@ -2391,7 +2511,38 @@ local function performInfectedDescent(
 	)
 
 	print("[INFECTION] Placeholder descent complete.")
-	print("[INFECTION] Invisible infected placeholder is ready for model replacement.")
+
+	-- Swap the hidden avatar for the prepared infected rig at the placeholder's
+	-- final position. The model is parented before assigning Player.Character.
+	local transformed = replacePlayerCharacter(
+		player,
+		character,
+		infectedCharacter,
+		placeholder.CFrame
+	)
+
+	if not transformed then
+		warn("[INFECTION] Transformation failed. Restoring the original character.")
+		if infectedCharacter and infectedCharacter.Parent then
+			infectedCharacter:Destroy()
+		end
+		restoreOriginalCharacter(
+			character,
+			humanoid,
+			root,
+			savedVisuals,
+			restoreState
+		)
+		placeholder:Destroy()
+		destroyDescentVines(descentVines)
+		return false
+	end
+
+	placeholder:Destroy()
+	destroyDescentVines(descentVines)
+
+	print("[INFECTION] Player successfully transformed into InfectedCharacter.")
+	return true
 end
 
 --------------------------------------------------
@@ -2618,6 +2769,16 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 			end
 
 			-- Hold, retract, hide, and lower the placeholder.
+			local restoreState = {
+				WalkSpeed = oldWalkSpeed,
+				AutoRotate = oldAutoRotate,
+				JumpPower = oldJumpPower,
+				JumpHeight = oldJumpHeight,
+				UseJumpPower = oldUseJumpPower,
+				RootAnchored = oldRootAnchored,
+				JumpingEnabled = wasJumpingEnabled
+			}
+
 			performInfectedDescent(
 				player,
 				character,
@@ -2626,7 +2787,8 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 				finalEntanglement,
 				outerLayer,
 				hoistVines,
-				roofResult
+				roofResult,
+				restoreState
 			)
 		end
 	end
