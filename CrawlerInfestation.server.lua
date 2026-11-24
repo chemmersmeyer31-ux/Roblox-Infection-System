@@ -121,7 +121,9 @@ end
 local faceFreezeStates = {}
 
 local function brieflyFreezePlayer(player, duration)
-  local character, root, humanoid = player and getCharacterParts(player)
+  if not player then return end
+  local character, root = getCharacterParts(player)
+  local humanoid = character and character:FindFirstChildOfClass("Humanoid")
   if not character or not root or not humanoid then return end
 
   local existing = faceFreezeStates[player]
