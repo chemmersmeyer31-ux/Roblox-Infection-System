@@ -62,6 +62,7 @@ local generatedCount = 0
 local occupiedPositions = {}
 local growthSegments = {}
 local growthStage = 1
+workspace:SetAttribute("InfectionStage", growthStage)
 local relocationStarted = false
 local infectionBulb = nil
 local OCCUPANCY_CELL_SIZE = 1.5
@@ -3496,6 +3497,7 @@ local function startStageFourRelocation()
 	end
 	stageFourTransitionRunning = true
 	growthStage = 4
+	workspace:SetAttribute("InfectionStage", growthStage)
 	relocationStarted = true
 	print("[INFECTION] Stage 4 relocation started.")
 
@@ -3520,6 +3522,7 @@ local function startStageFourRelocation()
 
 	if crawlToNestTarget() then
 		growthStage = 5
+		workspace:SetAttribute("InfectionStage", growthStage)
 		relocationStarted = false
 		formStageFiveNest()
 		print("[INFECTION] Stage 5 nest established.")
@@ -3538,6 +3541,7 @@ local function runInfectionStageController()
 		local count = #growthSegments
 		if growthStage == 1 and elapsed >= 75 and count >= 5 then
 			growthStage = 2
+			workspace:SetAttribute("InfectionStage", growthStage)
 			stageClock = os.clock()
 			setBulbSize(2.2, 12)
 			print("[INFECTION] Stage 2: the bulb is developing.")
@@ -3548,6 +3552,7 @@ local function runInfectionStageController()
 			end
 		elseif growthStage == 2 and elapsed >= 115 and count >= 35 then
 			growthStage = 3
+			workspace:SetAttribute("InfectionStage", growthStage)
 			stageClock = os.clock()
 			stageThreeStartedAt = stageClock
 			setBulbSize(3.8, 18)
@@ -3584,6 +3589,7 @@ local function handleDeveloperChatCommand(player, message)
 
 		local wasAlreadyStageThree = growthStage == 3
 		growthStage = 3
+		workspace:SetAttribute("InfectionStage", growthStage)
 		relocationStarted = false
 		stageClock = os.clock()
 		stageThreeStartedAt = stageClock
