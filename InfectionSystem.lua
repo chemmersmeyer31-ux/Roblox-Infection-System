@@ -2976,7 +2976,8 @@ local function formStageFiveNest()
 			TweenService:Create(pod, TweenInfo.new(5 + i * 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = Vector3.new(1.8, 2.8, 1.8)}):Play()
 		end
 	end
-	local rootPosition = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+	local groundHit = workspace:Raycast(infectionBulb.Position, Vector3.new(0, -24, 0), rayParams)
+	local rootPosition = groundHit and (groundHit.Position + Vector3.new(0, 0.06, 0)) or infectionBulb.Position - Vector3.new(0, 1.5, 0)
 	registerGroundAnchor(rootPosition, Vector3.new(0, 1, 0))
 	for i = 1, 8 do
 		local angle = (i - 1) * math.pi * 0.25
