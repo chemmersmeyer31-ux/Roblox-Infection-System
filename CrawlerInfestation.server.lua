@@ -128,6 +128,7 @@ local function makeCrawler(startPosition, startNormal)
     local born = os.clock()
     local nextLeap = born + rng:NextNumber(7, 18)
     local latchedUntil = 0
+    local latchedAt = 0
     local latchedRoot = nil
     local lastSeen = 0
     local wanderAngle = rng:NextNumber(0, math.pi * 2)
@@ -148,7 +149,8 @@ local function makeCrawler(startPosition, startNormal)
         if latchedRoot and latchedRoot.Parent and now < latchedUntil then
             local character = latchedRoot.Parent
             local offset = Vector3.new(0, 1.2 + math.sin(now * 7) * 0.12, 0)
-            position = latchedRoot.Position + offset
+            local climbProgress = math.clamp((now - latchedAt) / math.max(latchedUntil - latchedAt, 0.1), 0, 1)
+            position = latchedRoot.Position + Vector3.new(0, 0.65 + climbProgress * 2.1, 0) + latchedRoot.CFrame.LookVector * 0.35
             normal = Vector3.yAxis
             forward = latchedRoot.CFrame.LookVector
         else
@@ -164,6 +166,7 @@ local function makeCrawler(startPosition, startNormal)
 
                 if distance <= LEAP_DISTANCE and now >= nextLeap then
                     latchedRoot = target
+                    latchedAt = now
                     latchedUntil = now + rng:NextNumber(3.5, 6)
                     nextLeap = now + rng:NextNumber(22, 36)
                     position = target.Position + Vector3.new(0, 1.2, 0)
