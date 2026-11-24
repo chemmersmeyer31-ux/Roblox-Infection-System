@@ -71,9 +71,9 @@ local groundStalks = {}
 
 local activeGrabCount = 0
 local infectionGrowthBoosts = 0
-local GROWTH_BOOST_MULTIPLIER = 7
-local GROWTH_BOOST_DURATION = 40
-local GROWTH_BOOST_COOLDOWN = 8
+local GROWTH_BOOST_MULTIPLIER = 15
+local GROWTH_BOOST_DURATION = 60
+local GROWTH_BOOST_COOLDOWN = 4
 local growthBoostUntil = 0
 local lastGrowthBoostAt = -math.huge
 local lastGroundStalkSpawn = 0
@@ -345,7 +345,7 @@ local function createSegment(startPosition, endPosition, faceNormal, thickness)
 	local growthTween = TweenService:Create(
 		segment,
 		TweenInfo.new(
-			GROWTH_TIME,
+			(os.clock() < growthBoostUntil) and (GROWTH_TIME / GROWTH_BOOST_MULTIPLIER) or GROWTH_TIME,
 			Enum.EasingStyle.Sine,
 			Enum.EasingDirection.Out
 		),
@@ -3394,14 +3394,17 @@ local function formStageFiveNest()
 				growStageFiveVine("Stage5NestCeilingTendril", ceilingHit.Position, raisedPosition, 0.58, 2.8)
 			end
 
-			-- The core only rises after the wall vines have begun growing,
-			-- so it appears to be pulled up by the tendrils.
-			task.wait(0.8)
-			TweenService:Create(
+			-- Let the wall anchors take hold, then slowly pull the core upward.
+			-- Wait for the movement to finish before growing the floor roots,
+			-- so the next stage of the transition does not overlap or pop in.
+			task.wait(0.9)
+			local liftTween = TweenService:Create(
 				infectionBulb,
-				TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
 				{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
-			):Play()
+			)
+			liftTween:Play()
+			liftTween.Completed:Wait()
 		else
 			-- No usable wall anchors: stay grounded rather than floating on
 			-- four short decorative legs.
@@ -3425,20 +3428,37 @@ local function formStageFiveNest()
 			growStageFiveVine("Stage5GroundSupportTentacle", hip, foot, 0.42, 1.6)
 			task.wait(0.4)
 		end
-		TweenService:Create(
+		local settleTween = TweenService:Create(
 			infectionBulb,
 			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
 			{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
-		):Play()
+		)
+		settleTween:Play()
+		settleTween.Completed:Wait()
 	end
 
-	-- One main bulb only. Grow a broad network of tendrils outward from
-	-- eight separate points around its grounded base.
+	-- Grow thick feeder roots from the underside of the single central bulb
+	-- down to the floor. The ground network begins at those connected roots,
+	-- rather than appearing as separate vines around the bulb.
+	local coreBottom = infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.46, 0)
+	for index = 1, 6 do
+		local angle = (index - 1) * (math.pi * 2 / 6)
+		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.28)
+		local floorJoin = groundPosition + radial * 0.22
+		growStageFiveVine(
+			"Stage5BulbToGroundRoot",
+			bulbSide,
+			floorJoin,
+			0.72,
+			2.4 + index * 0.12
+		)
+		task.wait(0.22)
+	end
+
 	registerGroundAnchor(groundPosition, Vector3.new(0, 1, 0))
-	-- Let the bulb settle and its structural roots begin before the
-	-- smaller ground network spreads. Stagger each main root so the nest
-	-- appears to grow outward in a living sequence instead of popping in.
-	task.wait(1.1)
+	-- Spread outward only after the visible bulb-to-floor roots have formed.
+	task.wait(1.2)
 	for index = 1, 12 do
 		local angle = (index - 1) * (math.pi * 2 / 12)
 		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -3533,7 +3553,7 @@ local function runGrowthBoostPartWatcher()
 			if now - lastGrowthBoostAt >= GROWTH_BOOST_COOLDOWN then
 				lastGrowthBoostAt = now
 				growthBoostUntil = now + GROWTH_BOOST_DURATION
-				print("[INFECTION] Growth accelerator touched! Growth speed increased 7x for 40 seconds.")
+				print("[INFECTION] Growth accelerator touched! Growth speed increased 15x for 60 seconds.")
 			end
 		end
 
