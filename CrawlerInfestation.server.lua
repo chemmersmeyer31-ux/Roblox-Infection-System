@@ -313,6 +313,20 @@ local function makeCrawler(startPosition, startNormal)
         local targetTorso = activeTarget and activeTarget.torso
         local targetDistance = targetRoot and (targetRoot.Position - position).Magnitude or math.huge
         local ignoreCharacter = activeTarget and activeTarget.character
+        local escortReference = workspace:FindFirstChild("InfectionBulbReference")
+        local escortBulb = escortReference and escortReference:IsA("ObjectValue") and escortReference.Value
+        local escortActive = currentStage() == 4
+            and workspace:GetAttribute("StageFourRelocating") == true
+            and escortBulb and escortBulb:IsA("BasePart")
+        local escortSlot = model:GetAttribute("EscortSlot")
+
+        -- Escorts resume formation whenever they are not responding to a visible player.
+        if escortActive and not visibleTarget and state ~= "leap"
+            and state ~= "cling" and state ~= "retreat" then
+            state = "escort"
+        elseif visibleTarget and state == "escort" then
+            setState("stalk", rng:NextNumber(2.5, 4.5))
+        end
 
         -- Recover cleanly if the player resets or disappears during a leap/cling.
         if state == "leap" and (not targetRoot or not targetTorso) then
@@ -369,7 +383,33 @@ local function makeCrawler(startPosition, startNormal)
                 end
             end
 
-            if state == "roam" then
+            if state == "escort" and escortActive then
+                -- Slot 1 scouts ahead; slot 2 protects the bulb's rear flank.
+                local bulbFrame = escortBulb.CFrame
+                local slot = escortSlot or 2
+                local offset = slot == 1
+                    and (bulbFrame.LookVector * 4.2 + bulbFrame.RightVector * 2.0)
+                    or (-bulbFrame.LookVector * 3.6 - bulbFrame.RightVector * 2.2)
+                local desired = escortBulb.Position + offset
+                local verticalGap = math.abs(desired.Y - position.Y)
+
+                -- Stay on the current traversable surface if the bulb is
+                -- climbing a wall; regroup when it reaches a nearby floor.
+                if verticalGap < 6 then
+                    local direction = desired - position
+                    if direction.Magnitude > 1.8 then
+                        position, normal, forward = steerOnSurface(
+                            position, normal, direction, 3.2 * math.min(dt, 0.08), nil
+                        )
+                    else
+                        local orbit = bulbFrame.RightVector * (slot == 1 and 1 or -1)
+                        position, normal, forward = steerOnSurface(
+                            position, normal, orbit, 0.65 * math.min(dt, 0.08), nil
+                        )
+                    end
+                end
+
+            elseif state == "roam" then
                 if now >= nextDecision then
                     local angle = rng:NextNumber(-math.pi, math.pi)
                     local base = tangentDirection(forward, normal)
@@ -531,6 +571,16 @@ local lastHatch = 0
 while script.Parent do
     local current = currentStage()
     local cap = MAX_CRAWLERS[current]
+
+    if current == 4 and workspace:GetAttribute("StageFourRelocating") == true then
+        local assigned = 0
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") and child.Name == "LegsOnlyCrawler" and assigned < 2 then
+                assigned += 1
+                child:SetAttribute("EscortSlot", assigned)
+            end
+        end
+    end
 
     if cap and #folder:GetChildren() < cap
         and os.clock() - lastHatch >= HATCH_INTERVAL[current] then
