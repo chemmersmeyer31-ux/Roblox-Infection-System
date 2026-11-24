@@ -118,6 +118,63 @@ local function getCharacterParts(player)
   return nil, nil, nil
 end
 
+local faceFreezeStates = {}
+
+local function brieflyFreezePlayer(player, duration)
+  local character, root, humanoid = player and getCharacterParts(player)
+  if not character or not root or not humanoid then return end
+
+  local existing = faceFreezeStates[player]
+  if existing and existing.humanoid == humanoid then
+    existing.untilTime = math.max(existing.untilTime, os.clock() + duration)
+    return
+  end
+
+  local wasJumpingEnabled = humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping)
+  local saved = {
+    humanoid = humanoid,
+    walkSpeed = humanoid.WalkSpeed,
+    jumpPower = humanoid.JumpPower,
+    jumpHeight = humanoid.JumpHeight,
+    autoRotate = humanoid.AutoRotate,
+    jumpingEnabled = wasJumpingEnabled,
+    untilTime = os.clock() + duration
+  }
+  faceFreezeStates[player] = saved
+
+  humanoid.WalkSpeed = 0
+  humanoid.JumpPower = 0
+  humanoid.JumpHeight = 0
+  humanoid.Jump = false
+  humanoid.AutoRotate = false
+  humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+  root.AssemblyLinearVelocity = Vector3.zero
+  root.AssemblyAngularVelocity = Vector3.zero
+
+  task.spawn(function()
+    while faceFreezeStates[player] == saved
+      and os.clock() < saved.untilTime
+      and humanoid.Parent
+      and character.Parent do
+      task.wait(0.05)
+    end
+
+    if faceFreezeStates[player] ~= saved then return end
+    faceFreezeStates[player] = nil
+
+    if humanoid.Parent and character.Parent and player.Character == character then
+      humanoid.WalkSpeed = saved.walkSpeed
+      humanoid.JumpPower = saved.jumpPower
+      humanoid.JumpHeight = saved.jumpHeight
+      humanoid.AutoRotate = saved.autoRotate
+      humanoid:SetStateEnabled(
+        Enum.HumanoidStateType.Jumping,
+        saved.jumpingEnabled
+      )
+    end
+  end)
+end
+
 local function canSeeTarget(origin, character, torso)
   if not character or not torso then
     return false
@@ -428,7 +485,9 @@ local function makeCrawler(startPosition, startNormal)
       )
       position = targetTorso.CFrame:PointToWorldSpace(localOffset)
       normal = -targetTorso.CFrame.LookVector
-      forward = targetTorso.CFrame.RightVector * clingSide
+      -- Rotate the crawler's leg layout 180 degrees across the face while
+      -- keeping its contact normal pointed outward from the head.
+      forward = -targetTorso.CFrame.RightVector * clingSide
     elseif state == "leap" and targetRoot and targetTorso then
       local alpha = math.clamp((now - leapStarted) / leapDuration, 0, 1)
       local eased = alpha * alpha * (3 - 2 * alpha)
@@ -440,7 +499,7 @@ local function makeCrawler(startPosition, startNormal)
       position = leapStart:Lerp(faceGoal, eased) + Vector3.yAxis * arcHeight
       leapGoal = faceGoal
       normal = -targetTorso.CFrame.LookVector
-      forward = targetTorso.CFrame.RightVector * clingSide
+      forward = -targetTorso.CFrame.RightVector * clingSide
 
       if alpha >= 1 then
         position = faceGoal
@@ -448,6 +507,9 @@ local function makeCrawler(startPosition, startNormal)
         clingDuration = rng:NextNumber(3.8, 5.2)
         stateUntil = now + clingDuration
         state = "cling"
+        if activeTarget and activeTarget.player then
+          brieflyFreezePlayer(activeTarget.player, 1)
+        end
       end
     elseif state == "retreat" then
       -- The crawler must detach from the avatar before surface steering:
