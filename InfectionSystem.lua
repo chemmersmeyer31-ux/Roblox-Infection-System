@@ -2994,25 +2994,75 @@ local function crawlToNestTarget()
 	local ok = pcall(function()
 		path:ComputeAsync(pathStart, pathFinish)
 	end)
-	if not ok or path.Status ~= Enum.PathStatus.Success then
-		warn("[INFECTION] No walkable route to the house marker. Check the doorway and make sure the zone covers the interior.")
-		return false
+	local routePoints = {}
+	local useWindowClimb = false
+	if ok and path.Status == Enum.PathStatus.Success then
+		for _, waypoint in ipairs(path:GetWaypoints()) do
+			local waypointFloor = findFloor(waypoint.Position)
+			local floorPosition = waypointFloor and waypointFloor.Position or waypoint.Position
+			table.insert(routePoints, {
+				position = floorPosition + Vector3.new(0, 2, 0),
+				mode = "ground"
+			})
+		end
+	else
+		-- If the navmesh cannot find a doorway route, look for a clear
+		-- horizontal band above the solid wall: this is the window opening.
+		local horizontal = Vector3.new(
+			targetFloor.Position.X - startFloor.Position.X,
+			0,
+			targetFloor.Position.Z - startFloor.Position.Z
+		)
+		if horizontal.Magnitude < 0.1 then
+			warn("[INFECTION] No floor route or usable window direction was found.")
+			return false
+		end
+		local direction = horizontal.Unit
+		local wallOrigin = startFloor.Position + Vector3.new(0, 2, 0)
+		local wallHit = workspace:Raycast(wallOrigin, direction * horizontal.Magnitude, floorParams)
+		local clearHeight = nil
+		if wallHit then
+			for height = 2.5, 8.5, 0.5 do
+				local rayOrigin = startFloor.Position + Vector3.new(0, height, 0)
+				local rayTarget = targetFloor.Position + Vector3.new(0, height, 0)
+				local obstruction = workspace:Raycast(rayOrigin, rayTarget - rayOrigin, floorParams)
+				if not obstruction then
+					clearHeight = height
+					break
+				end
+			end
+		end
+		if not wallHit or not clearHeight then
+			warn("[INFECTION] No doorway path or clear window-height opening found. Check the window is open and unobstructed.")
+			return false
+		end
+
+		local outsideWall = wallHit.Position - direction * 1.4
+		local insideWall = wallHit.Position + direction * 1.4
+		local climbY = startFloor.Position.Y + clearHeight
+		table.insert(routePoints, {position = Vector3.new(outsideWall.X, climbY, outsideWall.Z), mode = "climb"})
+		table.insert(routePoints, {position = Vector3.new(insideWall.X, climbY, insideWall.Z), mode = "window"})
+		table.insert(routePoints, {position = targetFloor.Position + Vector3.new(0, 2, 0), mode = "descend"})
+		useWindowClimb = true
+		print("[INFECTION] Stage 4: navmesh route unavailable; climbing the wall and passing through a clear window-height opening.")
 	end
 
+	-- Eight separate walking/climbing tentacles surround the bulb.
 	local legs = {}
-	for i = 1, 4 do
+	for i = 1, 8 do
 		legs[i] = makeWalkerLeg()
 	end
 
 	local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 0.65)
 	local current = startFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
 	infectionBulb.Position = current
-	print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone.")
+	if not useWindowClimb then
+		print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone with eight walking tentacles.")
+	end
 
-	for _, waypoint in ipairs(path:GetWaypoints()) do
-		local waypointFloor = findFloor(waypoint.Position)
-		local floorPosition = waypointFloor and waypointFloor.Position or waypoint.Position
-		local destination = floorPosition + Vector3.new(0, bulbRadius + 0.12, 0)
+	for _, routePoint in ipairs(routePoints) do
+		local destination = routePoint.position
+		local mode = routePoint.mode
 		local segmentStart = current
 		local distance = (destination - segmentStart).Magnitude
 		local steps = math.max(1, math.ceil(distance / 0.22))
@@ -3034,16 +3084,28 @@ local function crawlToNestTarget()
 			)
 
 			for legIndex, leg in ipairs(legs) do
-				local angle = (legIndex - 1) * math.pi * 0.5
-				local hip = infectionBulb.Position
-					+ Vector3.new(math.cos(angle) * 1.0, -0.25, math.sin(angle) * 1.0)
-				local stride = math.sin(os.clock() * 7 + legIndex * math.pi) * 0.45
-				local foot = hip + Vector3.new(
-					math.cos(angle) * (1.15 + stride),
-					-bulbRadius + 0.05 + math.max(0, stride) * 0.3,
-					math.sin(angle) * (1.15 + stride)
-				)
-				setCylinderBetween(leg, hip, foot, 0.42)
+				local angle = (legIndex - 1) * math.pi * 0.25
+				local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+				local hip = infectionBulb.Position + radial * 1.0 + Vector3.new(0, -0.2, 0)
+				local stride = math.sin(os.clock() * 8 + legIndex * math.pi * 0.5) * 0.42
+				local foot
+				if mode == "climb" or mode == "window" then
+					-- During the wall section, the limbs reach around the bulb
+					-- and brace against the vertical surface instead of the floor.
+					local verticalReach = ((legIndex % 2 == 0) and 1 or -1) * 0.65
+					foot = hip + Vector3.new(
+						-radial.X * (1.0 + stride),
+						verticalReach + stride * 0.25,
+						-radial.Z * (1.0 + stride)
+					)
+				else
+					foot = hip + Vector3.new(
+						radial.X * (1.15 + stride),
+						-bulbRadius + 0.05 + math.max(0, stride) * 0.3,
+						radial.Z * (1.15 + stride)
+					)
+				end
+				setCylinderBetween(leg, hip, foot, 0.38)
 			end
 			task.wait(0.06)
 		end
