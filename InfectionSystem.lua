@@ -5,6 +5,7 @@
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
+local PathfindingService = game:GetService("PathfindingService")
 
 local rng = Random.new()
 
@@ -54,6 +55,10 @@ local DARK_COLOR = Color3.fromRGB(51, 29, 25)
 
 local generatedCount = 0
 local occupiedPositions = {}
+local growthSegments = {}
+local growthStage = 1
+local relocationStarted = false
+local infectionBulb = nil
 local OCCUPANCY_CELL_SIZE = 1.5
 
 local groundAnchors = {}
@@ -326,6 +331,7 @@ local function createSegment(startPosition, endPosition, faceNormal, thickness)
 	segment.Size = Vector3.new(0.05, depth, thickness)
 	segment.CFrame = startCFrame
 	segment.Parent = infectionFolder
+	table.insert(growthSegments, segment)
 
 	local growthTween = TweenService:Create(
 		segment,
@@ -945,7 +951,7 @@ local function createSpawnerBulb(surfacePosition, surfaceNormal)
 	)
 	bulb.Parent = infectionFolder
 
-	local targetSize = Vector3.new(3.8, 3.8, 3.8)
+	local targetSize = Vector3.new(1.25, 1.25, 1.25)
 	local targetCFrame = bulb.CFrame + surfaceNormal.Unit * 1.75
 
 	TweenService:Create(
@@ -990,7 +996,8 @@ local function createSpawnerBulb(surfacePosition, surfaceNormal)
 	end)
 
 	growTween:Play()
-	print("[INFECTION] Simple round spawner bulb is growing.")
+	print("[INFECTION] Stage 1 seed bulb is growing.")
+	return bulb
 end
 
 --------------------------------------------------
@@ -1181,7 +1188,7 @@ local growBranch
 
 growBranch = function(position, normal, direction, steps, depth)
 	for i = 1, steps do
-		if generatedCount >= MAX_SEGMENTS then return end
+		if generatedCount >= MAX_SEGMENTS or relocationStarted then return end
 
 		direction = direction - normal * direction:Dot(normal)
 
@@ -1196,7 +1203,9 @@ growBranch = function(position, normal, direction, steps, depth)
 
 		direction = direction:Lerp(curvedDirection, 0.62).Unit
 
-		local stepLength = rng:NextNumber(MIN_LENGTH, MAX_LENGTH)
+		local settings = ({[1]={0.65,1.05,4.6,0.035,1},[2]={0.9,1.45,3.0,0.16,2},[3]={MIN_LENGTH,MAX_LENGTH,GROWTH_DELAY,BRANCH_CHANCE,MAX_BRANCH_DEPTH},[5]={MIN_LENGTH,MAX_LENGTH,1.35,0.48,6}})[growthStage]
+		if not settings then return end
+		local stepLength = rng:NextNumber(settings[1], settings[2])
 		local thickness = getThickness(depth)
 
 		local nextPosition, nextNormal, nextDirection =
@@ -1254,8 +1263,8 @@ growBranch = function(position, normal, direction, steps, depth)
 		normal = nextNormal
 		direction = nextDirection
 
-		if depth < MAX_BRANCH_DEPTH
-			and rng:NextNumber() < BRANCH_CHANCE
+		if depth < settings[5]
+			and rng:NextNumber() < settings[4]
 			and generatedCount < MAX_SEGMENTS then
 
 			local branchAngle = math.rad(rng:NextNumber(40, 110))
@@ -1279,7 +1288,7 @@ growBranch = function(position, normal, direction, steps, depth)
 			end)
 		end
 
-		task.wait(GROWTH_DELAY * rng:NextNumber(0.8, 1.3))
+		task.wait(settings[3] * rng:NextNumber(0.8, 1.3))
 	end
 end
 
@@ -2820,6 +2829,195 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 		print("[INFECTION] Capture sequence ended or was interrupted.")
 	end
 end
+
+--------------------------------------------------
+-- INFECTION STAGES AND RELOCATION
+--------------------------------------------------
+
+local function setBulbSize(size, duration)
+	if infectionBulb and infectionBulb.Parent then
+		TweenService:Create(infectionBulb, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = Vector3.new(size, size, size)}):Play()
+	end
+end
+
+local function retractStageThreeTendrils()
+	print("[INFECTION] Stage 4: retracting the old tendril network.")
+	local old = growthSegments
+	growthSegments = {}
+	for _, part in ipairs(old) do
+		if part and part.Parent then
+			local duration = rng:NextNumber(1.5, 2.8)
+			TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = Vector3.new(0.03, 0.02, 0.02), Transparency = 1}):Play()
+			task.delay(duration + 0.1, function()
+				if part and part.Parent then part:Destroy() end
+			end)
+		end
+	end
+	generatedCount = math.max(0, generatedCount - #old)
+	table.clear(occupiedPositions)
+	table.clear(groundAnchors)
+	table.clear(ceilingAnchors)
+	for _, stalk in ipairs(groundStalks) do
+		if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
+	end
+	table.clear(groundStalks)
+	for _, vine in ipairs(ceilingVines) do
+		if vine.model and vine.model.Parent then vine.model:Destroy() end
+	end
+	table.clear(ceilingVines)
+end
+
+local function makeWalkerLeg()
+	local part = Instance.new("Part")
+	part.Name = "Stage4WalkingTentacle"
+	part.Shape = Enum.PartType.Cylinder
+	part.Material = Enum.Material.CorrodedMetal
+	part.Color = Color3.fromRGB(72, 37, 29)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.Parent = infectionFolder
+	return part
+end
+
+local function crawlToNestTarget()
+	local target = workspace:FindFirstChild("InfectionNestTarget", true)
+	if not target or not target:IsA("BasePart") then
+		warn("[INFECTION] Missing BasePart named InfectionNestTarget.")
+		return false
+	end
+	local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 4, AgentCanJump = true, WaypointSpacing = 4})
+	local ok = pcall(function()
+		path:ComputeAsync(infectionBulb.Position, target.Position)
+	end)
+	if not ok or path.Status ~= Enum.PathStatus.Success then
+		warn("[INFECTION] Pathfinding could not reach InfectionNestTarget. Check that the marker is on a walkable floor.")
+		return false
+	end
+	local legs = {}
+	for i = 1, 4 do legs[i] = makeWalkerLeg() end
+	local current = infectionBulb.Position
+	print("[INFECTION] Stage 4: crawling toward InfectionNestTarget.")
+	for _, waypoint in ipairs(path:GetWaypoints()) do
+		local destination = waypoint.Position + Vector3.new(0, 1.6, 0)
+		local distance = (destination - current).Magnitude
+		local steps = math.max(1, math.ceil(distance / 0.22))
+		for step = 1, steps do
+			if not infectionBulb or not infectionBulb.Parent then break end
+			local nextPosition = current:Lerp(destination, step / steps)
+			local facing = destination - current
+			if facing.Magnitude < 0.05 then facing = Vector3.new(0, 0, 1) end
+			infectionBulb.CFrame = CFrame.lookAt(nextPosition + Vector3.new(0, math.sin(os.clock() * 6) * 0.1, 0), nextPosition + facing.Unit)
+			for legIndex, leg in ipairs(legs) do
+				local angle = (legIndex - 1) * math.pi * 0.5
+				local hip = infectionBulb.Position + Vector3.new(math.cos(angle) * 0.95, -0.2, math.sin(angle) * 0.95)
+				local stride = math.sin(os.clock() * 6 + legIndex * math.pi) * 0.55
+				local foot = hip + Vector3.new(math.cos(angle) * (1.25 + stride), -1.35 + math.max(0, stride) * 0.45, math.sin(angle) * (1.25 + stride))
+				setCylinderBetween(leg, hip, foot, 0.42)
+			end
+			task.wait(0.08)
+		end
+		current = destination
+	end
+	for _, leg in ipairs(legs) do if leg and leg.Parent then leg:Destroy() end end
+	return (infectionBulb.Position - (target.Position + Vector3.new(0, 1.6, 0))).Magnitude < 10
+end
+
+local function formStageFiveNest()
+	if not infectionBulb or not infectionBulb.Parent then return end
+	print("[INFECTION] Stage 5: forming the nest.")
+	local directions = {Vector3.new(1,0,0), Vector3.new(-1,0,0), Vector3.new(0,0,1), Vector3.new(0,0,-1), Vector3.new(1,0,1).Unit, Vector3.new(-1,0,1).Unit, Vector3.new(1,0,-1).Unit, Vector3.new(-1,0,-1).Unit}
+	local hits = {}
+	for _, direction in ipairs(directions) do
+		local hit = workspace:Raycast(infectionBulb.Position, direction * 12, rayParams)
+		if hit and hit.Instance:IsA("BasePart") and hit.Instance.CanCollide then table.insert(hits, hit) end
+	end
+	local ceilingHit = workspace:Raycast(infectionBulb.Position, Vector3.new(0, 18, 0), rayParams)
+	if #hits >= 2 or (ceilingHit and #hits >= 1) then
+		local raised = infectionBulb.Position + Vector3.new(0, 3.2, 0)
+		for _, hit in ipairs(hits) do
+			local vine = newCaptureVine("Stage5NestAttachmentTendril", 0.42)
+			setCylinderBetween(vine, raised, hit.Position, 0.42)
+		end
+		if ceilingHit then
+			local vine = newCaptureVine("Stage5NestCeilingTendril", 0.48)
+			setCylinderBetween(vine, raised, ceilingHit.Position, 0.48)
+		end
+		TweenService:Create(infectionBulb, TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Position = raised, Size = Vector3.new(5.2, 5.2, 5.2)}):Play()
+	else
+		for i = 1, 4 do
+			local angle = (i - 1) * math.pi * 0.5
+			local hip = infectionBulb.Position + Vector3.new(math.cos(angle) * 0.85, -0.25, math.sin(angle) * 0.85)
+			local foot = hip + Vector3.new(math.cos(angle) * 1.5, -1.2, math.sin(angle) * 1.5)
+			local support = newCaptureVine("Stage5GroundSupportTentacle", 0.38)
+			setCylinderBetween(support, hip, foot, 0.38)
+		end
+		TweenService:Create(infectionBulb, TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = infectionBulb.Position + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}):Play()
+	end
+	-- Fabricated cocoons remain grounded and have no AI in this prototype.
+	for i = 1, 4 do
+		local angle = (i - 1) * math.pi * 0.5 + 0.4
+		local origin = infectionBulb.Position + Vector3.new(math.cos(angle) * 6.5, 8, math.sin(angle) * 6.5)
+		local floorHit = workspace:Raycast(origin, Vector3.new(0, -26, 0), rayParams)
+		if floorHit then
+			local pod = Instance.new("Part")
+			pod.Name = "FabricatedParasiteCocoon"
+			pod.Shape = Enum.PartType.Ball
+			pod.Material = Enum.Material.CorrodedMetal
+			pod.Color = Color3.fromRGB(82, 42, 33)
+			pod.Anchored = true
+			pod.CanCollide = false
+			pod.CanTouch = false
+			pod.CanQuery = false
+			pod.Size = Vector3.new(0.2, 0.2, 0.2)
+			pod.Position = floorHit.Position + Vector3.new(0, 1.1, 0)
+			pod.Parent = infectionFolder
+			TweenService:Create(pod, TweenInfo.new(5 + i * 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = Vector3.new(1.8, 2.8, 1.8)}):Play()
+		end
+	end
+	local rootPosition = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+	registerGroundAnchor(rootPosition, Vector3.new(0, 1, 0))
+	for i = 1, 8 do
+		local angle = (i - 1) * math.pi * 0.25
+		task.spawn(growBranch, rootPosition, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 38, 1)
+	end
+end
+
+local function runInfectionStageController()
+	local stageClock = os.clock()
+	while infectionFolder.Parent and growthStage < 4 do
+		task.wait(2)
+		local elapsed = os.clock() - stageClock
+		local count = #growthSegments
+		if growthStage == 1 and elapsed >= 75 and count >= 10 then
+			growthStage = 2
+			stageClock = os.clock()
+			setBulbSize(2.2, 12)
+			print("[INFECTION] Stage 2: the bulb is developing.")
+		elseif growthStage == 2 and elapsed >= 115 and count >= 45 then
+			growthStage = 3
+			stageClock = os.clock()
+			setBulbSize(3.8, 18)
+			print("[INFECTION] Stage 3: mature parasite growth. Original growth settings restored.")
+		elseif growthStage == 3 and elapsed >= 180 and count >= 180 then
+			growthStage = 4
+			relocationStarted = true
+			setBulbSize(4.3, 7)
+			retractStageThreeTendrils()
+			task.wait(3.2)
+			if crawlToNestTarget() then
+				growthStage = 5
+				relocationStarted = false
+				formStageFiveNest()
+				print("[INFECTION] Stage 5 nest established.")
+			else
+				warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
+			end
+		end
+	end
+end
+
 --------------------------------------------------
 -- START INFECTION
 --------------------------------------------------
@@ -2844,7 +3042,7 @@ registerGroundAnchor(startPosition, startNormal)
 registerCeilingAnchor(startPosition, startNormal)
 
 -- Create the infection's starting bulb.
-createSpawnerBulb(
+infectionBulb = createSpawnerBulb(
 	startingSurface.Position,
 	startingSurface.Normal
 )
@@ -2878,12 +3076,13 @@ task.spawn(function()
 		startPosition,
 		startNormal,
 		startDirection,
-		rng:NextInteger(35, 48),
+		rng:NextInteger(5, 7),
 		0
 	)
 end)
 
--- Start the player-reactive systems.
+-- Start progression and the player-reactive systems.
+task.spawn(runInfectionStageController)
 task.spawn(runGroundStalkSystem)
 task.spawn(runCeilingVineSystem)
 
