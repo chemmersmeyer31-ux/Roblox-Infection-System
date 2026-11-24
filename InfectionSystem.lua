@@ -1689,9 +1689,9 @@ local function getCharacterCocoonBounds(root)
   local _, boxSize = root.Parent:GetBoundingBox()
 
   return Vector3.new(
-    boxSize.X + 0.16,
-    boxSize.Y + 0.18,
-    boxSize.Z + 0.16
+    boxSize.X + 0.08,
+    boxSize.Y + 0.12,
+    boxSize.Z + 0.08
   )
 end
 
@@ -1703,9 +1703,11 @@ local function createCocoonEntanglement(root, cocoonData)
   local cocoonSize = cocoonData and cocoonData.targetSize
     or getCharacterCocoonBounds(root)
 
-  local radiusX = cocoonSize.X * 0.5 + 0.02
+  -- Slightly narrow the sides so the vine shell follows the player's
+  -- silhouette instead of reading as a round ball.
+  local radiusX = cocoonSize.X * 0.46 + 0.02
   local radiusY = cocoonSize.Y * 0.5 + 0.02
-  local radiusZ = cocoonSize.Z * 0.5 + 0.02
+  local radiusZ = cocoonSize.Z * 0.46 + 0.02
 
   local strands = {}
   local segmentCount = 48
@@ -1881,9 +1883,9 @@ end
 local function createOuterVineLayer(root)
   local cocoonSize = getCharacterCocoonBounds(root)
 
-  local radiusX = cocoonSize.X * 0.5 + 0.04
+  local radiusX = cocoonSize.X * 0.46 + 0.04
   local radiusY = cocoonSize.Y * 0.5 + 0.04
-  local radiusZ = cocoonSize.Z * 0.5 + 0.04
+  local radiusZ = cocoonSize.Z * 0.46 + 0.04
 
   local strands = {}
   local strandCount = 5
@@ -2525,6 +2527,7 @@ local function performInfectedDescent(
 
   -- Ground stalks must never capture this player again after transformation.
   infectedPlayers[player] = true
+  player:SetAttribute("IsInfected", true)
 
   local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
   local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
