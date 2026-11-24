@@ -3498,6 +3498,35 @@ local function formStageFiveNest()
 	end
 end
 
+local stageFourTransitionRunning = false
+
+local function startStageFourRelocation()
+	if stageFourTransitionRunning or growthStage >= 4 then
+		return false
+	end
+	stageFourTransitionRunning = true
+	growthStage = 4
+	relocationStarted = true
+	print("[INFECTION] MITE! :D Stage 4 relocation started.")
+
+	if infectionBulb and infectionBulb.Parent then
+		setBulbSize(4.3, 7)
+	end
+	retractStageThreeTendrils()
+	task.wait(3.2)
+
+	if crawlToNestTarget() then
+		growthStage = 5
+		relocationStarted = false
+		formStageFiveNest()
+		print("[INFECTION] Stage 5 nest established.")
+	else
+		warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
+	end
+	stageFourTransitionRunning = false
+	return true
+end
+
 local function runInfectionStageController()
 	local stageClock = os.clock()
 	while infectionFolder.Parent and growthStage < 4 do
@@ -3526,22 +3555,68 @@ local function runInfectionStageController()
 				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
 			end
 		elseif growthStage == 3 and elapsed >= 180 and count >= 120 then
-			growthStage = 4
-			relocationStarted = true
-			setBulbSize(4.3, 7)
-			retractStageThreeTendrils()
-			task.wait(3.2)
-			if crawlToNestTarget() then
-				growthStage = 5
-				relocationStarted = false
-				formStageFiveNest()
-				print("[INFECTION] Stage 5 nest established.")
-			else
-				warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
-			end
+				startStageFourRelocation()
 		end
 	end
 end
+
+--------------------------------------------------
+-- DEVELOPER CHAT COMMANDS
+--------------------------------------------------
+
+local function showMiteAnnouncement()
+	if not infectionBulb or not infectionBulb.Parent then return end
+
+	local oldAnnouncement = infectionBulb:FindFirstChild("MiteAnnouncement")
+	if oldAnnouncement then oldAnnouncement:Destroy() end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "MiteAnnouncement"
+	billboard.Adornee = infectionBulb
+	billboard.Size = UDim2.fromOffset(220, 54)
+	billboard.StudsOffset = Vector3.new(0, infectionBulb.Size.Y * 0.7 + 1.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = infectionBulb
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "MITE! :D"
+	label.TextColor3 = Color3.fromRGB(255, 220, 90)
+	label.TextStrokeTransparency = 0.15
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Parent = billboard
+
+	task.delay(5, function()
+		if billboard.Parent then billboard:Destroy() end
+	end)
+end
+
+local function handleDeveloperChatCommand(player, message)
+	local requestedStage = message:match("^%s*/stage%s+(%d+)%s*$")
+	if requestedStage ~= "4" then return end
+
+	if growthStage >= 4 or stageFourTransitionRunning then
+		print("[INFECTION] " .. player.Name .. " requested Stage 4, but the parasite is already at Stage " .. tostring(growthStage) .. ".")
+		return
+	end
+
+	print("[INFECTION] " .. player.Name .. " used /stage 4 — MITE! :D")
+	showMiteAnnouncement()
+	task.spawn(startStageFourRelocation)
+end
+
+local function connectStageChatCommand(player)
+	player.Chatted:Connect(function(message)
+		handleDeveloperChatCommand(player, message)
+	end)
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	connectStageChatCommand(player)
+end
+Players.PlayerAdded:Connect(connectStageChatCommand)
 
 --------------------------------------------------
 -- TOUCH-ACTIVATED GROWTH BOOST PART
