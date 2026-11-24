@@ -3124,6 +3124,39 @@ local function crawlToNestTarget()
 	return (infectionBulb.Position - (targetFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0))).Magnitude < 10
 end
 
+local function growStageFiveVine(name, pointA, pointB, thickness, duration)
+	local difference = pointB - pointA
+	local length = math.max(difference.Magnitude, 0.05)
+	local axis = difference.Unit
+	local up = Vector3.new(0, 1, 0) - axis * axis.Y
+	if up.Magnitude < 0.05 then
+		up = Vector3.new(1, 0, 0) - axis * axis.X
+	end
+	up = up.Unit
+	local side = axis:Cross(up).Unit
+	local finalCFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
+
+	local vine = newCaptureVine(name, thickness)
+	vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
+	vine.CFrame = CFrame.fromMatrix(
+		pointA + axis * 0.03,
+		axis,
+		up,
+		side
+	)
+
+	local tween = TweenService:Create(
+		vine,
+		TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{
+			Size = Vector3.new(length, thickness, thickness),
+			CFrame = finalCFrame
+		}
+	)
+	tween:Play()
+	return vine
+end
+
 local function formStageFiveNest()
 	if not infectionBulb or not infectionBulb.Parent then return end
 	print("[INFECTION] Stage 5: forming the suspended nest.")
@@ -3186,14 +3219,14 @@ local function formStageFiveNest()
 		-- as a reliable fallback so it never simply floats unsupported.
 		local attachmentCount = 0
 		for _, hit in ipairs(wallHits) do
-			local attachment = newCaptureVine("Stage5NestAttachmentTendril", 0.48)
-			setCylinderBetween(attachment, raisedPosition, hit.Position, 0.48)
+			growStageFiveVine("Stage5NestAttachmentTendril", raisedPosition, hit.Position, 0.48, rng:NextNumber(1.8, 2.8))
 			attachmentCount += 1
 			if attachmentCount >= 5 then break end
+			task.wait(rng:NextNumber(0.35, 0.65))
 		end
 		if ceilingHit then
-			local attachment = newCaptureVine("Stage5NestCeilingTendril", 0.52)
-			setCylinderBetween(attachment, raisedPosition, ceilingHit.Position, 0.52)
+			task.wait(0.45)
+			growStageFiveVine("Stage5NestCeilingTendril", raisedPosition, ceilingHit.Position, 0.52, 2.2)
 			attachmentCount += 1
 		end
 		if attachmentCount == 0 then
@@ -3202,8 +3235,8 @@ local function formStageFiveNest()
 				local foot = groundPosition + Vector3.new(
 					math.cos(angle) * 2.2, 0, math.sin(angle) * 2.2
 				)
-				local brace = newCaptureVine("Stage5NestSupportTendril", 0.5)
-				setCylinderBetween(brace, raisedPosition, foot, 0.5)
+				growStageFiveVine("Stage5NestSupportTendril", raisedPosition, foot, 0.5, 1.8)
+				task.wait(0.45)
 			end
 		end
 		TweenService:Create(
@@ -3221,8 +3254,8 @@ local function formStageFiveNest()
 			local foot = groundPosition + Vector3.new(
 				math.cos(angle) * 2.0, 0.05, math.sin(angle) * 2.0
 			)
-			local support = newCaptureVine("Stage5GroundSupportTentacle", 0.42)
-			setCylinderBetween(support, hip, foot, 0.42)
+			growStageFiveVine("Stage5GroundSupportTentacle", hip, foot, 0.42, 1.6)
+			task.wait(0.4)
 		end
 		TweenService:Create(
 			infectionBulb,
@@ -3234,11 +3267,16 @@ local function formStageFiveNest()
 	-- One main bulb only. Grow a broad network of tendrils outward from
 	-- eight separate points around its grounded base.
 	registerGroundAnchor(groundPosition, Vector3.new(0, 1, 0))
+	-- Let the bulb settle and its structural roots begin before the
+	-- smaller ground network spreads. Stagger each main root so the nest
+	-- appears to grow outward in a living sequence instead of popping in.
+	task.wait(1.1)
 	for index = 1, 12 do
 		local angle = (index - 1) * (math.pi * 2 / 12)
 		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
 		local startPoint = groundPosition + direction * 0.8
 		task.spawn(growBranch, startPoint, Vector3.new(0, 1, 0), direction, 42, 1)
+		task.wait(rng:NextNumber(0.28, 0.52))
 	end
 end
 
