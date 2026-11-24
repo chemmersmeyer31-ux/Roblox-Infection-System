@@ -3126,62 +3126,119 @@ end
 
 local function formStageFiveNest()
 	if not infectionBulb or not infectionBulb.Parent then return end
-	print("[INFECTION] Stage 5: forming the nest.")
-	local directions = {Vector3.new(1,0,0), Vector3.new(-1,0,0), Vector3.new(0,0,1), Vector3.new(0,0,-1), Vector3.new(1,0,1).Unit, Vector3.new(-1,0,1).Unit, Vector3.new(1,0,-1).Unit, Vector3.new(-1,0,-1).Unit}
-	local hits = {}
-	for _, direction in ipairs(directions) do
-		local hit = workspace:Raycast(infectionBulb.Position, direction * 12, rayParams)
-		if hit and hit.Instance:IsA("BasePart") and hit.Instance.CanCollide then table.insert(hits, hit) end
+	print("[INFECTION] Stage 5: forming the suspended nest.")
+
+	-- Find the floor beneath the bulb before moving it. Ground growth must
+	-- remain attached to the floor, not follow the elevated bulb.
+	local floorParams = RaycastParams.new()
+	floorParams.FilterType = Enum.RaycastFilterType.Exclude
+	floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
+	floorParams.IgnoreWater = true
+
+	local groundHit = workspace:Raycast(
+		infectionBulb.Position + Vector3.new(0, 4, 0),
+		Vector3.new(0, -40, 0),
+		floorParams
+	)
+	local groundPosition = groundHit
+		and groundHit.Position + Vector3.new(0, 0.06, 0)
+		or infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.5, 0)
+
+	local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
+	local isIndoors = false
+	if houseZone and houseZone:IsA("BasePart") then
+		local localPosition = houseZone.CFrame:PointToObjectSpace(infectionBulb.Position)
+		local halfSize = houseZone.Size * 0.5
+		isIndoors = math.abs(localPosition.X) <= halfSize.X
+			and math.abs(localPosition.Y) <= halfSize.Y
+			and math.abs(localPosition.Z) <= halfSize.Z
 	end
-	local ceilingHit = workspace:Raycast(infectionBulb.Position, Vector3.new(0, 18, 0), rayParams)
-	if #hits >= 2 or (ceilingHit and #hits >= 1) then
-		local raised = infectionBulb.Position + Vector3.new(0, 3.2, 0)
-		for _, hit in ipairs(hits) do
-			local vine = newCaptureVine("Stage5NestAttachmentTendril", 0.42)
-			setCylinderBetween(vine, raised, hit.Position, 0.42)
+
+	local directions = {
+		Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
+		Vector3.new(0, 0, 1), Vector3.new(0, 0, -1),
+		Vector3.new(1, 0, 1).Unit, Vector3.new(-1, 0, 1).Unit,
+		Vector3.new(1, 0, -1).Unit, Vector3.new(-1, 0, -1).Unit
+	}
+	local wallHits = {}
+	for _, direction in ipairs(directions) do
+		local hit = workspace:Raycast(
+			infectionBulb.Position,
+			direction * 14,
+			floorParams
+		)
+		if hit and hit.Instance:IsA("BasePart") and hit.Instance.CanCollide then
+			table.insert(wallHits, hit)
+		end
+	end
+	local ceilingHit = workspace:Raycast(
+		infectionBulb.Position,
+		Vector3.new(0, 20, 0),
+		floorParams
+	)
+
+	local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 1)
+	local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
+
+	if isIndoors then
+		-- In the house, the single central bulb is lifted above the floor.
+		-- Use nearby walls/ceiling when available, with floor-reaching braces
+		-- as a reliable fallback so it never simply floats unsupported.
+		local attachmentCount = 0
+		for _, hit in ipairs(wallHits) do
+			local attachment = newCaptureVine("Stage5NestAttachmentTendril", 0.48)
+			setCylinderBetween(attachment, raisedPosition, hit.Position, 0.48)
+			attachmentCount += 1
+			if attachmentCount >= 5 then break end
 		end
 		if ceilingHit then
-			local vine = newCaptureVine("Stage5NestCeilingTendril", 0.48)
-			setCylinderBetween(vine, raised, ceilingHit.Position, 0.48)
+			local attachment = newCaptureVine("Stage5NestCeilingTendril", 0.52)
+			setCylinderBetween(attachment, raisedPosition, ceilingHit.Position, 0.52)
+			attachmentCount += 1
 		end
-		TweenService:Create(infectionBulb, TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Position = raised, Size = Vector3.new(5.2, 5.2, 5.2)}):Play()
+		if attachmentCount == 0 then
+			for index = 1, 4 do
+				local angle = (index - 1) * math.pi * 0.5
+				local foot = groundPosition + Vector3.new(
+					math.cos(angle) * 2.2, 0, math.sin(angle) * 2.2
+				)
+				local brace = newCaptureVine("Stage5NestSupportTendril", 0.5)
+				setCylinderBetween(brace, raisedPosition, foot, 0.5)
+			end
+		end
+		TweenService:Create(
+			infectionBulb,
+			TweenInfo.new(5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+			{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
+		):Play()
 	else
-		for i = 1, 4 do
-			local angle = (i - 1) * math.pi * 0.5
-			local hip = infectionBulb.Position + Vector3.new(math.cos(angle) * 0.85, -0.25, math.sin(angle) * 0.85)
-			local foot = hip + Vector3.new(math.cos(angle) * 1.5, -1.2, math.sin(angle) * 1.5)
-			local support = newCaptureVine("Stage5GroundSupportTentacle", 0.38)
-			setCylinderBetween(support, hip, foot, 0.38)
+		-- Outdoors, keep the central bulb close to the ground.
+		for index = 1, 4 do
+			local angle = (index - 1) * math.pi * 0.5
+			local hip = groundPosition + Vector3.new(
+				math.cos(angle) * 0.85, 0.35, math.sin(angle) * 0.85
+			)
+			local foot = groundPosition + Vector3.new(
+				math.cos(angle) * 2.0, 0.05, math.sin(angle) * 2.0
+			)
+			local support = newCaptureVine("Stage5GroundSupportTentacle", 0.42)
+			setCylinderBetween(support, hip, foot, 0.42)
 		end
-		TweenService:Create(infectionBulb, TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = infectionBulb.Position + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}):Play()
+		TweenService:Create(
+			infectionBulb,
+			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
+		):Play()
 	end
-	-- Fabricated cocoons remain grounded and have no AI in this prototype.
-	for i = 1, 4 do
-		local angle = (i - 1) * math.pi * 0.5 + 0.4
-		local origin = infectionBulb.Position + Vector3.new(math.cos(angle) * 6.5, 8, math.sin(angle) * 6.5)
-		local floorHit = workspace:Raycast(origin, Vector3.new(0, -26, 0), rayParams)
-		if floorHit then
-			local pod = Instance.new("Part")
-			pod.Name = "FabricatedParasiteCocoon"
-			pod.Shape = Enum.PartType.Ball
-			pod.Material = Enum.Material.CorrodedMetal
-			pod.Color = Color3.fromRGB(82, 42, 33)
-			pod.Anchored = true
-			pod.CanCollide = false
-			pod.CanTouch = false
-			pod.CanQuery = false
-			pod.Size = Vector3.new(0.2, 0.2, 0.2)
-			pod.Position = floorHit.Position + Vector3.new(0, 1.1, 0)
-			pod.Parent = infectionFolder
-			TweenService:Create(pod, TweenInfo.new(5 + i * 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = Vector3.new(1.8, 2.8, 1.8)}):Play()
-		end
-	end
-	local groundHit = workspace:Raycast(infectionBulb.Position, Vector3.new(0, -24, 0), rayParams)
-	local rootPosition = groundHit and (groundHit.Position + Vector3.new(0, 0.06, 0)) or infectionBulb.Position - Vector3.new(0, 1.5, 0)
-	registerGroundAnchor(rootPosition, Vector3.new(0, 1, 0))
-	for i = 1, 8 do
-		local angle = (i - 1) * math.pi * 0.25
-		task.spawn(growBranch, rootPosition, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 38, 1)
+
+	-- One main bulb only. Grow a broad network of tendrils outward from
+	-- eight separate points around its grounded base.
+	registerGroundAnchor(groundPosition, Vector3.new(0, 1, 0))
+	for index = 1, 12 do
+		local angle = (index - 1) * (math.pi * 2 / 12)
+		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local startPoint = groundPosition + direction * 0.8
+		task.spawn(growBranch, startPoint, Vector3.new(0, 1, 0), direction, 42, 1)
 	end
 end
 
