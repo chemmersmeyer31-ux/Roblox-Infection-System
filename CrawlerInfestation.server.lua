@@ -175,17 +175,30 @@ local function tangentDirection(direction, normal)
 end
 
 local function steerOnSurface(position, normal, desiredDirection, distance, ignoreCharacter)
-    local direction = tangentDirection(desiredDirection, normal)
-    local probeOrigin = position + normal * 0.55
-    local obstacle = raycast(probeOrigin, direction * 1.5, ignoreCharacter)
+    -- On vertical surfaces, bias movement upward so the crawler actually climbs
+    -- instead of endlessly walking sideways or losing its tangent direction.
+    local desired = desiredDirection
+    if math.abs(normal.Y) < 0.65 then
+        desired = desired + Vector3.yAxis * 0.8
+    end
+    local direction = tangentDirection(desired, normal)
+    local probeOrigin = position + normal * 0.42
+    local obstacle = raycast(probeOrigin, direction * 1.65, ignoreCharacter)
 
     if obstacle then
-        -- Try sliding along the obstacle instead of walking straight into it.
+        local wallNormal = obstacle.Normal.Unit
+        -- A near-vertical obstacle is a climbable face. Attach to it, then
+        -- continue upward along its surface rather than steering away.
+        if math.abs(wallNormal.Y) < 0.65 and wallNormal:Dot(normal) < 0.82 then
+            local attached = obstacle.Position + wallNormal * 0.3
+            return attached, wallNormal, Vector3.yAxis
+        end
+
+        -- Otherwise slide around the obstruction.
         local slideA = tangentDirection(obstacle.Normal, normal)
         local slideB = -slideA
         local hitA = raycast(probeOrigin, slideA * 1.25, ignoreCharacter)
         local hitB = raycast(probeOrigin, slideB * 1.25, ignoreCharacter)
-
         if not hitA then
             direction = slideA
         elseif not hitB then
@@ -197,18 +210,32 @@ local function steerOnSurface(position, normal, desiredDirection, distance, igno
 
     local proposed = position + direction * distance
     local surface = raycast(proposed + normal * 1.3, -normal * 3.8, ignoreCharacter)
-
     if surface then
-        return surface.Position + surface.Normal * 0.28, surface.Normal.Unit, direction
+        return surface.Position + surface.Normal * 0.3, surface.Normal.Unit, direction
     end
 
-    -- Avoid walking off a floor edge. Turn instead of continuing into empty space.
+    -- At the top of a wall, look down for the ledge's upper surface and step onto it.
+    if math.abs(normal.Y) < 0.65 then
+        local topSurface = raycast(proposed + Vector3.yAxis * 1.25,
+            -Vector3.yAxis * 3.2, ignoreCharacter)
+        if topSurface and topSurface.Normal.Y > 0.55 then
+            return topSurface.Position + topSurface.Normal * 0.3,
+                topSurface.Normal.Unit, tangentDirection(direction, topSurface.Normal)
+        end
+    end
+
+    -- At a floor edge, check for a nearby vertical face to climb.
+    local forwardFace = raycast(position + normal * 0.35, direction * 1.8, ignoreCharacter)
+    if forwardFace and math.abs(forwardFace.Normal.Y) < 0.65 then
+        return forwardFace.Position + forwardFace.Normal * 0.3,
+            forwardFace.Normal.Unit, Vector3.yAxis
+    end
+
     local turn = tangentDirection(normal:Cross(direction), normal)
     local alternate = position + turn * distance
     local alternateSurface = raycast(alternate + normal * 1.3, -normal * 3.8, ignoreCharacter)
-
     if alternateSurface then
-        return alternateSurface.Position + alternateSurface.Normal * 0.28,
+        return alternateSurface.Position + alternateSurface.Normal * 0.3,
             alternateSurface.Normal.Unit, turn
     end
 
@@ -361,18 +388,34 @@ local function makeCrawler(startPosition, startNormal)
 
             if alpha >= 1 then
                 clingStarted = now
-                clingDuration = rng:NextNumber(3.2, 5.0)
+                clingDuration = rng:NextNumber(1.6, 2.4)
                 stateUntil = now + clingDuration
                 clingSide = rng:NextNumber() < 0.5 and -1 or 1
                 state = "cling"
             end
         elseif state == "retreat" then
-            local move = retreatDirection
-            position, normal, forward = steerOnSurface(
-                position, normal, move, RETREAT_SPEED * math.min(dt, 0.08), ignoreCharacter
-            )
+            -- The crawler must detach from the avatar before surface steering:
+            -- otherwise its raycasts can leave it stranded at the face/torso.
+            local groundHit = raycast(position + Vector3.yAxis * 1.5,
+                -Vector3.yAxis * 80, ignoreCharacter)
+            if groundHit then
+                local groundPosition = groundHit.Position + groundHit.Normal * 0.3
+                local delta = groundPosition - position
+                local step = math.min(delta.Magnitude, RETREAT_SPEED * 2.2 * math.min(dt, 0.08))
+                if delta.Magnitude > 0.05 then
+                    position = position + delta.Unit * step
+                end
+                if delta.Magnitude < 0.8 then
+                    normal = groundHit.Normal.Unit
+                end
+            else
+                position = position - Vector3.yAxis * (RETREAT_SPEED * math.min(dt, 0.08))
+            end
             if now >= stateUntil then
                 targetInfo = nil
+                targetRoot = nil
+                targetTorso = nil
+                normal = Vector3.yAxis
                 setState("roam", rng:NextNumber(2, 4))
             end
         else
@@ -487,7 +530,8 @@ local function makeCrawler(startPosition, startNormal)
                             local torsoCFrame = targetTorso.CFrame
                             local side = rng:NextNumber() < 0.5 and -1 or 1
                             leapStart = position
-                            leapGoal = torsoCFrame:PointToWorldSpace(Vector3.new(side * 0.62, 0.18, -0.18))
+                            -- Aim for the upper chest/shoulder area, not the face.
+                            leapGoal = torsoCFrame:PointToWorldSpace(Vector3.new(side * 0.72, -0.32, -0.38))
                             leapStarted = now
                             leapDuration = rng:NextNumber(0.38, 0.58)
                             nextLeap = now + rng:NextNumber(28, 42)
@@ -552,23 +596,36 @@ local function makeCrawler(startPosition, startNormal)
     return model
 end
 
-local function hatchBulb(position)
-    local bulb = makePart(folder, "CrawlerHatchingBulb", Enum.PartType.Ball,
-        Vector3.new(0.42, 0.36, 0.42), COLORS.seed)
-    bulb.Position = position
-    bulb.Material = Enum.Material.CorrodedMetal
+local function hatchBulb(position, surfaceNormal)
+    local normal = surfaceNormal and surfaceNormal.Unit or Vector3.yAxis
+    local egg = makePart(folder, "CrawlerEgg", Enum.PartType.Ball,
+        Vector3.new(0.3, 0.43, 0.3), Color3.fromRGB(248, 207, 64))
+    egg.Material = Enum.Material.SmoothPlastic
+    egg.CFrame = CFrame.lookAt(position + normal * 0.16,
+        position + normal * 1.16)
 
+    -- A clearly visible little yellow egg sits and pulses before hatching.
+    local baseSize = egg.Size
     local start = os.clock()
-    while bulb.Parent and os.clock() - start < 2.2 do
-        local pulse = 1 + math.sin((os.clock() - start) * 8) * 0.12
-        bulb.Size = Vector3.new(0.42, 0.36, 0.42) * pulse
+    local hatchDuration = 3.6
+    while egg.Parent and os.clock() - start < hatchDuration do
+        local elapsed = os.clock() - start
+        local pulse = 1 + math.sin(elapsed * 6.5) * 0.09
+        egg.Size = baseSize * pulse
         task.wait(0.08)
     end
 
-    if bulb.Parent then
-        local spawnPosition = bulb.Position + Vector3.new(0, 0.35, 0)
-        bulb:Destroy()
-        makeCrawler(spawnPosition, Vector3.yAxis)
+    if egg.Parent then
+        local spawnPosition = egg.Position + normal * 0.42
+        -- Shrink the shell away so the crawler visibly emerges from its egg.
+        for step = 1, 8 do
+            if not egg.Parent then break end
+            egg.Size = baseSize * (1 - step / 9)
+            egg.Transparency = step / 10
+            task.wait(0.045)
+        end
+        if egg.Parent then egg:Destroy() end
+        makeCrawler(spawnPosition, normal)
     end
 end
 
@@ -610,8 +667,8 @@ while script.Parent do
         local angle = rng:NextNumber(0, math.pi * 2)
         local radius = rng:NextNumber(3, 9)
         local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-        local hatchPosition = findGround(infectionSpawner.Position + offset)
-        task.spawn(hatchBulb, hatchPosition)
+        local hatchPosition, hatchNormal = findGround(infectionSpawner.Position + offset)
+        task.spawn(hatchBulb, hatchPosition, hatchNormal)
     end
 
     task.wait(2)
