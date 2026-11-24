@@ -3442,50 +3442,88 @@ local function formStageFiveNest()
 		settleTween.Completed:Wait()
 	end
 
-	-- Thin feeder roots connect the bulb to the real floor. Each endpoint is
-	-- independently raycast so roots never terminate on floating support parts.
+	-- Four substantial root supports rise from the actual floor and disappear
+	-- inside the lower half of the bulb. These are the visual legs of the nest.
+	local eggPointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
+	if eggPointsFolder then eggPointsFolder:Destroy() end
+	eggPointsFolder = Instance.new("Folder")
+	eggPointsFolder.Name = "StageFiveEggSpawnPoints"
+	eggPointsFolder.Parent = workspace
+
 	local rootTips = {}
-	local rootCount = 3
-	for index = 1, rootCount do
-		local angle = (index - 1) * (math.pi * 2 / rootCount) + math.pi * 0.18
+	for index = 1, 4 do
+		local angle = (index - 1) * math.pi * 0.5 + math.pi * 0.25
 		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local rayOrigin = infectionBulb.Position + radial * 1.1 + Vector3.new(0, 2, 0)
-		local actualFloor = workspace:Raycast(rayOrigin, Vector3.new(0, -80, 0), floorParams)
+		local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
+			+ Vector3.new(0, 3, 0)
+		local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -100, 0), floorParams)
 		if actualFloor and actualFloor.Normal.Y > 0.82 then
-			local floorJoin = actualFloor.Position + actualFloor.Normal * 0.07
-			local coreBottom = infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.43, 0)
-			local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.18)
-			growStageFiveVine(
-				"Stage5FeederRoot",
-				bulbSide,
-				floorJoin,
-				0.22,
-				rng:NextNumber(3.0, 3.8)
+			local base = actualFloor.Position + actualFloor.Normal * 0.08
+			local insideBulb = infectionBulb.Position
+				- Vector3.new(0, bulbRadius * 0.48, 0) + radial * (bulbRadius * 0.24)
+			local support = growStageFiveVine(
+				"Stage5RootSupport" .. index, base, insideBulb,
+				0.78, rng:NextNumber(3.2, 4.0)
 			)
-			table.insert(rootTips, {position = floorJoin, direction = radial})
+			table.insert(rootTips, {position = base, direction = radial, support = support})
+
+			local eggPoint = Instance.new("Part")
+			eggPoint.Name = "EggPoint" .. index
+			eggPoint.Anchored = true
+			eggPoint.Transparency = 1
+			eggPoint.CanCollide = false
+			eggPoint.CanTouch = false
+			eggPoint.CanQuery = false
+			eggPoint.Size = Vector3.new(0.2, 0.2, 0.2)
+			eggPoint.Position = base
+			eggPoint.Parent = eggPointsFolder
+
+			-- Smaller veins visibly branch out of each thick support and feed
+			-- back into the bulb instead of ending as isolated floating braces.
+			for veinIndex = 1, 2 do
+				local heightAlpha = veinIndex == 1 and 0.42 or 0.7
+				local veinStart = base:Lerp(insideBulb, heightAlpha)
+				local sideways = Vector3.new(-radial.Z, 0, radial.X)
+				local veinEnd = veinStart + radial * 1.25 + sideways * (veinIndex == 1 and 0.7 or -0.7)
+				growStageFiveVine(
+					"Stage5SupportVein", veinStart, veinEnd,
+					0.2, rng:NextNumber(1.0, 1.5)
+				)
+			end
+
+			-- Three low, branching runners crawl outward from every support base.
+			for branchIndex = 1, 3 do
+				local spread = (branchIndex - 2) * math.rad(52)
+				local direction = CFrame.fromAxisAngle(Vector3.yAxis, spread):VectorToWorldSpace(radial)
+				local distance = rng:NextNumber(5.5, 8.5)
+				local previous = base
+				for segmentIndex = 1, 4 do
+					local alpha = segmentIndex / 4
+					local drift = Vector3.new(0, 0, 0)
+					if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.35) end
+					if segmentIndex == 3 then drift = Vector3.new(0, 0, -0.25) end
+					local probe = base + direction * (distance * alpha) + drift + Vector3.new(0, 2, 0)
+					local ground = workspace:Raycast(probe, Vector3.new(0, -8, 0), floorParams)
+					if ground and ground.Normal.Y > 0.82 then
+						local nextPoint = ground.Position + ground.Normal * 0.07
+						growStageFiveVine(
+							"Stage5GroundCrawlerVine", previous, nextPoint,
+							math.max(0.13, 0.28 - segmentIndex * 0.025),
+						 rng:NextNumber(0.65, 1.0)
+						)
+						previous = nextPoint
+					end
+				end
+			end
 		end
-		task.wait(0.28)
+		task.wait(0.3)
 	end
 
-	-- Wait until feeder roots reach actual ground before starting any ground
-	-- branches. Floating wall braces are never registered as ground anchors.
+	-- Allow the supports and floor runners to finish extending before the
+	-- ordinary ground-growth network branches out from their real floor bases.
 	task.wait(4.0)
 	for _, root in ipairs(rootTips) do
 		registerGroundAnchor(root.position, Vector3.new(0, 1, 0))
-		for branchIndex = 1, 3 do
-			local spread = (branchIndex - 2) * math.rad(48)
-			local direction = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), spread)
-				:VectorToWorldSpace(root.direction)
-			task.spawn(
-				growBranch,
-				root.position,
-				Vector3.new(0, 1, 0),
-				direction,
-				rng:NextInteger(24, 32),
-				1
-			)
-			task.wait(rng:NextNumber(0.22, 0.38))
-		end
 	end
 end
 
