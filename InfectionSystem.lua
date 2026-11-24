@@ -3029,6 +3029,31 @@ local function retractStageThreeTendrils()
 	table.clear(ceilingVines)
 end
 
+-- Walker limbs use cylinder Parts, whose long axis is local Y in Roblox.
+-- Keep the segment direction on that axis so the limb actually reaches
+-- from its hip to its knee/foot instead of being rotated sideways.
+local function setWalkerCylinderBetween(part, pointA, pointB, thickness)
+	local difference = pointB - pointA
+	local length = math.max(difference.Magnitude, 0.05)
+	local axis = difference.Unit
+
+	local reference = Vector3.new(0, 1, 0)
+	if math.abs(axis:Dot(reference)) > 0.96 then
+		reference = Vector3.new(1, 0, 0)
+	end
+
+	local right = axis:Cross(reference).Unit
+	local back = right:Cross(axis).Unit
+
+	part.Size = Vector3.new(thickness, length, thickness)
+	part.CFrame = CFrame.fromMatrix(
+		(pointA + pointB) * 0.5,
+		right,
+		axis,
+		back
+	)
+end
+
 local function makeWalkerLeg()
 	local function makeLimbPart(name, thickness)
 		local part = Instance.new("Part")
@@ -3238,8 +3263,8 @@ local function crawlToNestTarget()
 						+ Vector3.new(0, -bulbRadius + 0.06 + lift, 0)
 				end
 
-				setCylinderBetween(leg.upper, hip, knee, 0.43)
-				setCylinderBetween(leg.lower, knee, foot, 0.29)
+				setWalkerCylinderBetween(leg.upper, hip, knee, 0.43)
+				setWalkerCylinderBetween(leg.lower, knee, foot, 0.29)
 				leg.upper.Transparency = 0
 				leg.lower.Transparency = 0
 			end
