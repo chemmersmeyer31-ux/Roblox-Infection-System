@@ -105,7 +105,10 @@ local function getCharacterParts(player)
 
   local root = character:FindFirstChild("HumanoidRootPart")
   local humanoid = character:FindFirstChildOfClass("Humanoid")
-  local torso = character:FindFirstChild("UpperTorso")
+  -- Use the head as the attachment target so leaps land on the face,
+  -- while retaining a fallback for unusual character rigs.
+  local torso = character:FindFirstChild("Head")
+    or character:FindFirstChild("UpperTorso")
     or character:FindFirstChild("Torso")
     or root
 
@@ -391,27 +394,33 @@ local function makeCrawler(startPosition, startNormal)
     if state == "cling" and targetRoot and targetTorso and now < stateUntil then
       local progress = math.clamp((now - clingStarted) / clingDuration, 0, 1)
       local orbit = math.sin(progress * math.pi * 2) * 0.18
+      -- Stay attached to the front of the head and crawl slightly
+      -- across the face before releasing.
       local localOffset = Vector3.new(
-        clingSide * (0.55 + orbit),
-        0.15 + progress * 0.58,
-        -0.28 + math.cos(progress * math.pi * 2) * 0.12
+        clingSide * (0.22 + orbit * 0.45),
+        -0.04 + math.sin(progress * math.pi * 2) * 0.08,
+        -0.68
       )
       position = targetTorso.CFrame:PointToWorldSpace(localOffset)
-      normal = targetTorso.CFrame.RightVector * clingSide
-      forward = targetTorso.CFrame.LookVector
+      normal = -targetTorso.CFrame.LookVector
+      forward = targetTorso.CFrame.RightVector * clingSide
     elseif state == "leap" and targetRoot and targetTorso then
       local alpha = math.clamp((now - leapStarted) / leapDuration, 0, 1)
       local eased = alpha * alpha * (3 - 2 * alpha)
-      position = leapStart:Lerp(leapGoal, eased)
-      normal = (targetTorso.Position - position).Magnitude > 0.05
-        and (position - targetTorso.Position).Unit or Vector3.yAxis
-      forward = targetTorso.CFrame.LookVector
+      local faceGoal = targetTorso.CFrame:PointToWorldSpace(
+        Vector3.new(clingSide * 0.22, -0.04, -0.68)
+      )
+      local arcHeight = math.sin(alpha * math.pi) * 1.35
+      position = leapStart:Lerp(faceGoal, eased) + Vector3.yAxis * arcHeight
+      leapGoal = faceGoal
+      normal = -targetTorso.CFrame.LookVector
+      forward = targetTorso.CFrame.RightVector * clingSide
 
       if alpha >= 1 then
+        position = faceGoal
         clingStarted = now
-        clingDuration = rng:NextNumber(1.6, 2.4)
+        clingDuration = rng:NextNumber(3.8, 5.2)
         stateUntil = now + clingDuration
-        clingSide = rng:NextNumber() < 0.5 and -1 or 1
         state = "cling"
       end
     elseif state == "retreat" then
@@ -551,8 +560,11 @@ local function makeCrawler(startPosition, startNormal)
               local torsoCFrame = targetTorso.CFrame
               local side = rng:NextNumber() < 0.5 and -1 or 1
               leapStart = position
-              -- Aim for the upper chest/shoulder area, not the face.
-              leapGoal = torsoCFrame:PointToWorldSpace(Vector3.new(side * 0.72, -0.32, -0.38))
+              -- Aim just in front of the face; the leap phase adds a short arc.
+              clingSide = side
+              leapGoal = torsoCFrame:PointToWorldSpace(
+                Vector3.new(side * 0.22, -0.04, -0.68)
+              )
               leapStarted = now
               leapDuration = rng:NextNumber(0.38, 0.58)
               nextLeap = now + rng:NextNumber(28, 42)
