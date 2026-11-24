@@ -2990,17 +2990,27 @@ local function runInfectionStageController()
 		task.wait(2)
 		local elapsed = os.clock() - stageClock
 		local count = #growthSegments
-		if growthStage == 1 and elapsed >= 75 and count >= 10 then
+		if growthStage == 1 and elapsed >= 75 and count >= 5 then
 			growthStage = 2
 			stageClock = os.clock()
 			setBulbSize(2.2, 12)
 			print("[INFECTION] Stage 2: the bulb is developing.")
-		elseif growthStage == 2 and elapsed >= 115 and count >= 45 then
+			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+			for index = 1, 4 do
+				local angle = (index - 1) * math.pi * 0.5
+				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 18, 0)
+			end
+		elseif growthStage == 2 and elapsed >= 115 and count >= 35 then
 			growthStage = 3
 			stageClock = os.clock()
 			setBulbSize(3.8, 18)
 			print("[INFECTION] Stage 3: mature parasite growth. Original growth settings restored.")
-		elseif growthStage == 3 and elapsed >= 180 and count >= 180 then
+			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+			for index = 1, 8 do
+				local angle = (index - 1) * math.pi * 0.25
+				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
+			end
+		elseif growthStage == 3 and elapsed >= 180 and count >= 120 then
 			growthStage = 4
 			relocationStarted = true
 			setBulbSize(4.3, 7)
