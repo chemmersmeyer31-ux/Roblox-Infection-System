@@ -69,16 +69,17 @@ local function placeRod(part, a, b, thickness)
   end
 
   local axis = delta.Unit
-  local up = Vector3.yAxis - axis * axis.Y
-  if up.Magnitude < 0.04 then
-    up = Vector3.xAxis - axis * axis.X
+  -- Roblox cylinders extend along their local Y axis, not X.
+  local right = Vector3.yAxis:Cross(axis)
+  if right.Magnitude < 0.04 then
+    right = Vector3.xAxis - axis * axis.X
   end
-  up = up.Unit
-  local side = axis:Cross(up).Unit
+  right = right.Unit
+  local back = right:Cross(axis).Unit
 
   part.Transparency = 0
-  part.Size = Vector3.new(delta.Magnitude, thickness, thickness)
-  part.CFrame = CFrame.fromMatrix((a + b) * 0.5, axis, up, side)
+  part.Size = Vector3.new(thickness, delta.Magnitude, thickness)
+  part.CFrame = CFrame.fromMatrix((a + b) * 0.5, right, axis, back)
 end
 
 local function makeIgnoreList(extra)
