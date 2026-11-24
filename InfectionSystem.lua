@@ -3455,35 +3455,46 @@ local function formStageFiveNest()
 		settleTween.Completed:Wait()
 	end
 
-	-- Only two long support legs remain between the core and the floor.
-	-- This replaces the crowded six-root bundle and gives the bulb a cleaner,
-	-- deliberate connection to the ground while its wall anchors spread out.
-	local coreBottomY = math.max(infectionBulb.Position.Y - infectionBulb.Size.Y * 0.46, groundPosition.Y + 0.18)
+	-- A few thin roots emerge directly from the underside of the core.
+	-- They reach the floor at separate points; the larger ground network then
+	-- branches from those root tips instead of growing as a bundle below the bulb.
+	local coreBottomY = math.max(infectionBulb.Position.Y - infectionBulb.Size.Y * 0.48, groundPosition.Y + 0.18)
 	local coreBottom = Vector3.new(infectionBulb.Position.X, coreBottomY, infectionBulb.Position.Z)
-	for index = 1, 2 do
-		local side = index == 1 and -1 or 1
-		local radial = Vector3.new(side, 0, 0)
-		local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.28)
-		local floorJoin = groundPosition + radial * 0.48
+	local rootTips = {}
+	for index = 1, 4 do
+		local angle = (index - 1) * (math.pi * 2 / 4) + math.pi * 0.25
+		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.22)
+		local floorJoin = groundPosition + radial * 2.6
 		growStageFiveVine(
-			"Stage5ElongatedLegSupport",
+			"Stage5SmallFeederRoot",
 			bulbSide,
 			floorJoin,
-			0.86,
-			3.4 + index * 0.35
+			0.28,
+			rng:NextNumber(2.8, 3.6)
 		)
-		task.wait(0.38)
+		table.insert(rootTips, {position = floorJoin, direction = radial})
+		task.wait(0.3)
 	end
 
-	registerGroundAnchor(groundPosition, Vector3.new(0, 1, 0))
-	-- Spread outward only after the visible bulb-to-floor roots have formed.
-	task.wait(1.2)
-	for index = 1, 12 do
-		local angle = (index - 1) * (math.pi * 2 / 12)
-		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local startPoint = groundPosition + direction * 0.8
-		task.spawn(growBranch, startPoint, Vector3.new(0, 1, 0), direction, 42, 1)
-		task.wait(rng:NextNumber(0.28, 0.52))
+	-- Let the small feeder roots reach the floor before branching outward.
+	task.wait(1.4)
+	for _, root in ipairs(rootTips) do
+		registerGroundAnchor(root.position, Vector3.new(0, 1, 0))
+		for branchIndex = 1, 3 do
+			local spread = (branchIndex - 2) * math.rad(48)
+			local direction = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), spread)
+				:VectorToWorldSpace(root.direction)
+			task.spawn(
+				growBranch,
+				root.position,
+				Vector3.new(0, 1, 0),
+				direction,
+				rng:NextInteger(24, 32),
+				1
+			)
+			task.wait(rng:NextNumber(0.22, 0.38))
+		end
 	end
 end
 
