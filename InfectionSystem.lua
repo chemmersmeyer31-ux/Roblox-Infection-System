@@ -2559,9 +2559,9 @@ local function rewardSuccessfulInfection(anchor)
 
 	-- The central bulb also swells slightly with each successful feeding.
 	if infectionBulb and infectionBulb.Parent then
-		local baseSize = infectionStageBulbSize or infectionBulb.Size.X
+		local stageBaseSize = ({[1]=1.25, [2]=2.2, [3]=3.8})[growthStage] or infectionBulb.Size.X
 		local addedSize = math.min(infectionGrowthBoosts * 0.18, 0.9)
-		local targetSize = baseSize + addedSize
+		local targetSize = stageBaseSize + addedSize
 		TweenService:Create(
 			infectionBulb,
 			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
