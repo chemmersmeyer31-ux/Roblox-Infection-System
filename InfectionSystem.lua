@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
 local PathfindingService = game:GetService("PathfindingService")
+local TextChatService = game:GetService("TextChatService")
 
 local rng = Random.new()
 
@@ -1470,6 +1471,7 @@ local function setCylinderBetween(part, pointA, pointB, thickness)
 		up,
 		side
 	)
+	part.Transparency = 0
 end
 
 local function newCaptureVine(name, thickness)
@@ -3039,6 +3041,7 @@ local function makeWalkerLeg()
 		part.CanCollide = false
 		part.CanTouch = false
 		part.CanQuery = false
+		part.Transparency = 1 -- Hide at the origin until the first animation frame positions it.
 		part.Parent = infectionFolder
 		return part
 	end
@@ -3170,7 +3173,7 @@ local function crawlToNestTarget()
 	local current = startFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
 	infectionBulb.Position = current
 	if not useWindowClimb then
-		print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone with eight walking tentacles.")
+		print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone with six walking tentacles.")
 	end
 
 	for _, routePoint in ipairs(routePoints) do
@@ -3216,7 +3219,7 @@ local function crawlToNestTarget()
 				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * (math.pi * 2 / 3)
 				local stride = math.sin(phase)
 				local lift = math.max(0, math.cos(phase)) * 0.62
-				local hip = infectionBulb.Position + radial * 0.92 + Vector3.new(0, -0.18, 0)
+						local hip = infectionBulb.Position + radial * (bulbRadius * 0.88) + Vector3.new(0, -0.18, 0)
 				local knee
 				local foot
 
@@ -3507,13 +3510,26 @@ local function startStageFourRelocation()
 	stageFourTransitionRunning = true
 	growthStage = 4
 	relocationStarted = true
-	print("[INFECTION] MITE! :D Stage 4 relocation started.")
+	print("[INFECTION] Stage 4 relocation started.")
 
+	-- Finish resizing the body before calculating limb attachment points.
+	-- Previously the bulb kept growing while the legs were already walking,
+	-- making their roots appear to pull away from the expanding body.
+	local sizeTween
 	if infectionBulb and infectionBulb.Parent then
-		setBulbSize(4.3, 7)
+		sizeTween = TweenService:Create(
+			infectionBulb,
+			TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+			{Size = Vector3.new(4.3, 4.3, 4.3)}
+		)
+		sizeTween:Play()
 	end
+
 	retractStageThreeTendrils()
-	task.wait(3.2)
+	if sizeTween then
+		sizeTween.Completed:Wait()
+	end
+	task.wait(0.4)
 
 	if crawlToNestTarget() then
 		growthStage = 5
@@ -3564,49 +3580,24 @@ end
 -- DEVELOPER CHAT COMMANDS
 --------------------------------------------------
 
-local function showMiteAnnouncement()
-	if not infectionBulb or not infectionBulb.Parent then return end
-
-	local oldAnnouncement = infectionBulb:FindFirstChild("MiteAnnouncement")
-	if oldAnnouncement then oldAnnouncement:Destroy() end
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "MiteAnnouncement"
-	billboard.Adornee = infectionBulb
-	billboard.Size = UDim2.fromOffset(220, 54)
-	billboard.StudsOffset = Vector3.new(0, infectionBulb.Size.Y * 0.7 + 1.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = infectionBulb
-
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Text = "MITE! :D"
-	label.TextColor3 = Color3.fromRGB(255, 220, 90)
-	label.TextStrokeTransparency = 0.15
-	label.Font = Enum.Font.FredokaOne
-	label.TextScaled = true
-	label.Parent = billboard
-
-	task.delay(5, function()
-		if billboard.Parent then billboard:Destroy() end
-	end)
-end
-
 local function handleDeveloperChatCommand(player, message)
 	local requestedStage = message:match("^%s*/stage%s+(%d+)%s*$")
 	if requestedStage ~= "4" then return end
 
-	if growthStage >= 4 or stageFourTransitionRunning then
-		print("[INFECTION] " .. player.Name .. " requested Stage 4, but the parasite is already at Stage " .. tostring(growthStage) .. ".")
+	if stageFourTransitionRunning then
+		warn("[INFECTION] Stage 4 transition is already running.")
+		return
+	end
+	if growthStage >= 4 then
+		warn("[INFECTION] The parasite has already reached Stage " .. tostring(growthStage) .. ".")
 		return
 	end
 
-	print("[INFECTION] " .. player.Name .. " used /stage 4 — MITE! :D")
-	showMiteAnnouncement()
+	print("[INFECTION] " .. player.Name .. " used /stage 4.")
 	task.spawn(startStageFourRelocation)
 end
 
+-- Legacy chat support.
 local function connectStageChatCommand(player)
 	player.Chatted:Connect(function(message)
 		handleDeveloperChatCommand(player, message)
@@ -3617,6 +3608,23 @@ for _, player in ipairs(Players:GetPlayers()) do
 	connectStageChatCommand(player)
 end
 Players.PlayerAdded:Connect(connectStageChatCommand)
+
+-- Modern TextChatService command support. This catches slash commands that
+-- the new chat system routes away from Player.Chatted.
+local stageTextCommand = TextChatService:FindFirstChild("StageFourTextCommand")
+if not stageTextCommand then
+	stageTextCommand = Instance.new("TextChatCommand")
+	stageTextCommand.Name = "StageFourTextCommand"
+	stageTextCommand.PrimaryAlias = "/stage"
+	stageTextCommand.Parent = TextChatService
+end
+
+stageTextCommand.Triggered:Connect(function(textSource, unfilteredText)
+	local player = Players:GetPlayerByUserId(textSource.UserId)
+	if player then
+		handleDeveloperChatCommand(player, unfilteredText)
+	end
+end)
 
 --------------------------------------------------
 -- TOUCH-ACTIVATED GROWTH BOOST PART
