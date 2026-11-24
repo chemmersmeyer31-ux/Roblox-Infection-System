@@ -701,7 +701,7 @@ local function getStageTwoRootSpots()
   local spots = {}
   for _, root in ipairs(selected) do
     local normal = root.CFrame.UpVector.Unit
-    local surfacePoint = root.Position + normal * (root.Size.Y * 0.5 + 0.1)
+    local surfacePoint = root.Position + normal * (root.Size.Y * 0.5)
     table.insert(spots, {position = surfacePoint, normal = normal})
   end
   return spots
