@@ -666,6 +666,47 @@ local function countCrawlers()
   return count
 end
 
+local function getStageTwoRootSpots()
+  local roots = {}
+  for _, item in ipairs(workspace:GetDescendants()) do
+    if item:IsA("BasePart") and item.Name == "LivingTendril"
+      and (item.Position - infectionSpawner.Position).Magnitude <= 14 then
+      table.insert(roots, item)
+    end
+  end
+
+  table.sort(roots, function(a, b)
+    return (a.Position - infectionSpawner.Position).Magnitude
+      < (b.Position - infectionSpawner.Position).Magnitude
+  end)
+
+  if #roots == 0 then return {} end
+
+  local first = roots[1]
+  local second
+  local bestSeparation = 0
+  for index = 2, math.min(#roots, 16) do
+    local separation = (roots[index].Position - first.Position).Magnitude
+    if separation > bestSeparation then
+      bestSeparation = separation
+      second = roots[index]
+    end
+  end
+
+  local selected = {first}
+  if second and bestSeparation > 0.65 then
+    table.insert(selected, second)
+  end
+
+  local spots = {}
+  for _, root in ipairs(selected) do
+    local normal = root.CFrame.UpVector.Unit
+    local surfacePoint = root.Position + normal * (root.Size.Y * 0.5 + 0.1)
+    table.insert(spots, {position = surfacePoint, normal = normal})
+  end
+  return spots
+end
+
 local function ensureStageTwoEggs()
   local eggs = {}
   for _, child in ipairs(folder:GetChildren()) do
@@ -673,13 +714,21 @@ local function ensureStageTwoEggs()
       table.insert(eggs, child)
     end
   end
-  local desiredEggs = 4
-  for index = #eggs + 1, desiredEggs do
-    local angle = (index - 1) * (math.pi * 2 / desiredEggs)
-    local radius = 2.7 + (index % 2) * 0.8
-    local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-    local position, normal = findGround(infectionSpawner.Position + offset)
-    createEgg(position, normal)
+
+  while #eggs > 2 do
+    table.remove(eggs):Destroy()
+  end
+
+  local spots = getStageTwoRootSpots()
+  for index = 1, math.min(2, #spots) do
+    local spot = spots[index]
+    if eggs[index] then
+      local egg = eggs[index]
+      egg.Position = spot.position + spot.normal * 0.22
+      egg.CFrame = CFrame.lookAt(egg.Position, egg.Position + spot.normal)
+    else
+      createEgg(spot.position + spot.normal * 0.32, spot.normal)
+    end
   end
 end
 
