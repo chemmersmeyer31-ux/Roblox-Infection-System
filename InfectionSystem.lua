@@ -3264,7 +3264,7 @@ local function crawlToNestTarget()
 	return (infectionBulb.Position - (targetFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0))).Magnitude < 10
 end
 
-local function growStageFiveVine(name, pointA, pointB, thickness, duration)
+local function setStageFiveVineBetween(vine, pointA, pointB, thickness)
 	local difference = pointB - pointA
 	local length = math.max(difference.Magnitude, 0.05)
 	local axis = difference.Unit
@@ -3274,24 +3274,34 @@ local function growStageFiveVine(name, pointA, pointB, thickness, duration)
 	end
 	up = up.Unit
 	local side = axis:Cross(up).Unit
-	local finalCFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
+	vine.Size = Vector3.new(length, thickness, thickness)
+	vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
+end
 
+local function growStageFiveVine(name, pointA, pointB, thickness, duration)
+	local difference = pointB - pointA
+	local length = math.max(difference.Magnitude, 0.05)
+	local axis = difference.Unit
 	local vine = newCaptureVine(name, thickness)
 	vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
-	vine.CFrame = CFrame.fromMatrix(
-		pointA + axis * 0.03,
-		axis,
-		up,
-		side
-	)
+	setStageFiveVineBetween(vine, pointA, pointA + axis * 0.03, thickness * 0.55)
 
 	local tween = TweenService:Create(
 		vine,
 		TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		{
-			Size = Vector3.new(length, thickness, thickness),
-			CFrame = finalCFrame
-		}
+		{Size = Vector3.new(length, thickness, thickness),
+		 CFrame = CFrame.fromMatrix(
+			(pointA + pointB) * 0.5,
+			axis,
+			(Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
+				and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
+				or Vector3.new(1, 0, 0),
+			axis:Cross(
+				(Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
+					and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
+					or Vector3.new(1, 0, 0)
+			).Unit
+		 )}
 	)
 	tween:Play()
 	return vine
@@ -3299,28 +3309,29 @@ end
 
 local function formStageFiveNest()
 	if not infectionBulb or not infectionBulb.Parent then return end
-	print("[INFECTION] Stage 5: forming the suspended nest.")
+	print("[INFECTION] Stage 5: the creature is extending its nest anchors.")
 
-	-- Find the floor beneath the bulb before moving it. Ground growth must
-	-- remain attached to the floor, not follow the elevated bulb.
 	local floorParams = RaycastParams.new()
 	floorParams.FilterType = Enum.RaycastFilterType.Exclude
 	floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
 	floorParams.IgnoreWater = true
 
-	local groundHit = workspace:Raycast(
-		infectionBulb.Position + Vector3.new(0, 4, 0),
-		Vector3.new(0, -40, 0),
+	local startPosition = infectionBulb.Position
+	local startSize = infectionBulb.Size
+	local bulbRadius = math.max(startSize.Y * 0.5, 1)
+	local floorHit = workspace:Raycast(
+		startPosition + Vector3.new(0, 4, 0),
+		Vector3.new(0, -60, 0),
 		floorParams
 	)
-	local groundPosition = groundHit
-		and groundHit.Position + Vector3.new(0, 0.06, 0)
-		or infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.5, 0)
+	local groundPosition = floorHit
+		and floorHit.Position + Vector3.new(0, 0.06, 0)
+		or Vector3.new(startPosition.X, startPosition.Y - bulbRadius + 0.06, startPosition.Z)
 
 	local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
 	local isIndoors = false
 	if houseZone and houseZone:IsA("BasePart") then
-		local localPosition = houseZone.CFrame:PointToObjectSpace(infectionBulb.Position)
+		local localPosition = houseZone.CFrame:PointToObjectSpace(startPosition)
 		local halfSize = houseZone.Size * 0.5
 		isIndoors = math.abs(localPosition.X) <= halfSize.X
 			and math.abs(localPosition.Y) <= halfSize.Y
@@ -3333,159 +3344,131 @@ local function formStageFiveNest()
 		Vector3.new(1, 0, 1).Unit, Vector3.new(-1, 0, 1).Unit,
 		Vector3.new(1, 0, -1).Unit, Vector3.new(-1, 0, -1).Unit
 	}
-	local wallHits = {}
-	for _, direction in ipairs(directions) do
-		local hit = workspace:Raycast(
-			infectionBulb.Position,
-			direction * 14,
-			floorParams
-		)
-		if hit and hit.Instance:IsA("BasePart") and hit.Instance.CanCollide then
-			table.insert(wallHits, hit)
+	local attachmentPoints = {}
+	local function addAttachment(position, normal)
+		if normal and math.abs(normal.Y) > 0.65 then return end
+		for _, existing in ipairs(attachmentPoints) do
+			if (existing.position - position).Magnitude < 4 then return end
 		end
+		table.insert(attachmentPoints, {position = position, normal = normal})
 	end
-	local ceilingHit = workspace:Raycast(
-		infectionBulb.Position,
-		Vector3.new(0, 20, 0),
-		floorParams
-	)
-
-	local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 1)
-	local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
 
 	if isIndoors then
-		-- Four optional wall markers give precise attachment locations.
-		-- Name them InfectionNestAnchor1 through InfectionNestAnchor4.
-		local markerHits = {}
+		-- User-placed marker parts are optional overrides, not required objects.
 		for index = 1, 4 do
 			local marker = workspace:FindFirstChild("InfectionNestAnchor" .. index, true)
 			if marker and marker:IsA("BasePart") then
-				table.insert(markerHits, {Position = marker.Position, Instance = marker})
+				addAttachment(marker.Position, nil)
 			end
 		end
 
-		-- Keep attachment points visually separated. Two markers can
-		-- accidentally be placed at nearly the same spot, which makes two
-		-- large tendrils overlap and look like a single doubled-up anchor.
-		local attachmentPoints = {}
-		local MIN_ANCHOR_SPACING = 4.5
+		-- Automatically discover wall attachment points so Anchor 1 is not
+		-- dependent on a manually-created marker part.
+		for _, direction in ipairs(directions) do
+			if #attachmentPoints >= 4 then break end
+			local origin = startPosition + Vector3.new(0, rng:NextNumber(-0.35, 0.35), 0)
+			local hit = workspace:Raycast(origin, direction * 18, floorParams)
+			if hit and hit.Instance:IsA("BasePart")
+				and hit.Instance.CanCollide
+				and math.abs(hit.Normal.Y) < 0.65 then
+				addAttachment(hit.Position, hit.Normal)
+			end
+		end
+	end
 
-		local function addUniqueAttachmentPoint(position)
-			for _, existingPoint in ipairs(attachmentPoints) do
-				if (existingPoint - position).Magnitude < MIN_ANCHOR_SPACING then
-					return false
+	local anchorVines = {}
+	if isIndoors and #attachmentPoints >= 2 then
+		local attachmentCount = math.min(#attachmentPoints, 4)
+		for index = 1, attachmentCount do
+			local attachment = attachmentPoints[index]
+			local towardWall = attachment.position - startPosition
+			local radial = Vector3.new(towardWall.X, 0, towardWall.Z)
+			if radial.Magnitude < 0.05 then
+				radial = Vector3.new(math.cos(index * math.pi * 0.5), 0, math.sin(index * math.pi * 0.5))
+			else
+				radial = radial.Unit
+			end
+			local bulbSurface = startPosition + radial * (bulbRadius * 0.78)
+			local thickness = index <= 2 and 0.82 or 0.58
+			local duration = index <= 2 and rng:NextNumber(3.8, 4.6) or rng:NextNumber(2.8, 3.5)
+			local vine = growStageFiveVine(
+				"Stage5NestAnchor" .. index,
+				bulbSurface,
+				attachment.position,
+				thickness,
+				duration
+			)
+			table.insert(anchorVines, {
+				vine = vine,
+				wallPoint = attachment.position,
+				radial = radial,
+				thickness = thickness
+			})
+			task.wait(0.42)
+		end
+
+		-- Let every anchor finish extending from the actual bulb before it lifts.
+		task.wait(4.8)
+		local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
+		local liftTween = TweenService:Create(
+			infectionBulb,
+			TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+			{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
+		)
+		liftTween:Play()
+		while liftTween.PlaybackState == Enum.PlaybackState.Playing do
+			if not infectionBulb or not infectionBulb.Parent then break end
+			local currentRadius = infectionBulb.Size.X * 0.5
+			for _, anchor in ipairs(anchorVines) do
+				if anchor.vine and anchor.vine.Parent then
+					local corePoint = infectionBulb.Position + anchor.radial * (currentRadius * 0.78)
+					setStageFiveVineBetween(anchor.vine, corePoint, anchor.wallPoint, anchor.thickness)
 				end
 			end
-			table.insert(attachmentPoints, position)
-			return true
+			task.wait(0.05)
 		end
-
-		-- Prefer the user's marker parts, preserving their chosen locations.
-		for _, markerHit in ipairs(markerHits) do
-			addUniqueAttachmentPoint(markerHit.Position)
-		end
-
-		-- If markers overlap or there are too few of them, fill the remaining
-		-- slots with distinct nearby wall hits instead of stacking tendrils.
-		for _, hit in ipairs(wallHits) do
-			if #attachmentPoints >= 4 then break end
-			addUniqueAttachmentPoint(hit.Position)
-		end
-
-		-- Do not raise the core unless it has at least two real wall anchors.
-		-- This prevents the old unsupported floating-core appearance.
-		if #attachmentPoints >= 2 then
-			local attachmentCount = math.min(#attachmentPoints, 4)
-			for index = 1, attachmentCount do
-				local wallPoint = attachmentPoints[index]
-				-- Nest anchors shoot outward from the core toward the walls.
-				-- The first two are thicker primary supports; the remaining
-				-- anchors branch out afterward to spread the suspended nest.
-				local thickness = index <= 2 and 0.88 or 0.58
-				growStageFiveVine(
-					index <= 2 and "Stage5PrimaryCoreAnchor" or "Stage5CoreAnchor",
-					raisedPosition,
-					wallPoint,
-					thickness,
-					index <= 2 and rng:NextNumber(3.8, 4.6) or rng:NextNumber(2.6, 3.4)
-				)
-				task.wait(rng:NextNumber(0.45, 0.7))
-			end
-
-			if ceilingHit and attachmentCount < 4 then
-				task.wait(0.45)
-				growStageFiveVine("Stage5NestCeilingTendril", ceilingHit.Position, raisedPosition, 0.58, 2.8)
-			end
-
-			-- Let the wall anchors take hold, then slowly pull the core upward.
-			-- Wait for the movement to finish before growing the floor roots,
-			-- so the next stage of the transition does not overlap or pop in.
-			task.wait(0.9)
-			local liftTween = TweenService:Create(
-				infectionBulb,
-				TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-				{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
-			)
-			liftTween:Play()
-			liftTween.Completed:Wait()
-		else
-			-- No usable wall anchors: stay grounded rather than floating on
-			-- four short decorative legs.
-			warn("[INFECTION] Fewer than two wall anchors found; keeping the Stage 5 core grounded. Add four InfectionNestAnchor parts to suspend it.")
-			local settleTween = TweenService:Create(
-				infectionBulb,
-				TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-				{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
-			)
-			settleTween:Play()
-			settleTween.Completed:Wait()
-		end
+		liftTween.Completed:Wait()
 	else
-		-- Outdoors, keep the central bulb close to the ground.
-		for index = 1, 4 do
-			local angle = (index - 1) * math.pi * 0.5
-			local hip = groundPosition + Vector3.new(
-				math.cos(angle) * 0.85, 0.35, math.sin(angle) * 0.85
-			)
-			local foot = groundPosition + Vector3.new(
-				math.cos(angle) * 2.0, 0.05, math.sin(angle) * 2.0
-			)
-			growStageFiveVine("Stage5GroundSupportTentacle", hip, foot, 0.42, 1.6)
-			task.wait(0.4)
+		if isIndoors then
+			warn("[INFECTION] Not enough wall attachment surfaces were found. The creature will settle on the floor instead of floating unsupported.")
 		end
 		local settleTween = TweenService:Create(
 			infectionBulb,
-			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
 			{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
 		)
 		settleTween:Play()
 		settleTween.Completed:Wait()
 	end
 
-	-- A few thin roots emerge directly from the underside of the core.
-	-- They reach the floor at separate points; the larger ground network then
-	-- branches from those root tips instead of growing as a bundle below the bulb.
-	local coreBottomY = math.max(infectionBulb.Position.Y - infectionBulb.Size.Y * 0.48, groundPosition.Y + 0.18)
-	local coreBottom = Vector3.new(infectionBulb.Position.X, coreBottomY, infectionBulb.Position.Z)
+	-- Thin feeder roots connect the bulb to the real floor. Each endpoint is
+	-- independently raycast so roots never terminate on floating support parts.
 	local rootTips = {}
-	for index = 1, 4 do
-		local angle = (index - 1) * (math.pi * 2 / 4) + math.pi * 0.25
+	local rootCount = 3
+	for index = 1, rootCount do
+		local angle = (index - 1) * (math.pi * 2 / rootCount) + math.pi * 0.18
 		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.22)
-		local floorJoin = groundPosition + radial * 2.6
-		growStageFiveVine(
-			"Stage5SmallFeederRoot",
-			bulbSide,
-			floorJoin,
-			0.28,
-			rng:NextNumber(2.8, 3.6)
-		)
-		table.insert(rootTips, {position = floorJoin, direction = radial})
-		task.wait(0.3)
+		local rayOrigin = infectionBulb.Position + radial * 1.1 + Vector3.new(0, 2, 0)
+		local actualFloor = workspace:Raycast(rayOrigin, Vector3.new(0, -80, 0), floorParams)
+		if actualFloor and actualFloor.Normal.Y > 0.82 then
+			local floorJoin = actualFloor.Position + actualFloor.Normal * 0.07
+			local coreBottom = infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.43, 0)
+			local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.18)
+			growStageFiveVine(
+				"Stage5FeederRoot",
+				bulbSide,
+				floorJoin,
+				0.22,
+				rng:NextNumber(3.0, 3.8)
+			)
+			table.insert(rootTips, {position = floorJoin, direction = radial})
+		end
+		task.wait(0.28)
 	end
 
-	-- Let the small feeder roots reach the floor before branching outward.
-	task.wait(1.4)
+	-- Wait until feeder roots reach actual ground before starting any ground
+	-- branches. Floating wall braces are never registered as ground anchors.
+	task.wait(4.0)
 	for _, root in ipairs(rootTips) do
 		registerGroundAnchor(root.position, Vector3.new(0, 1, 0))
 		for branchIndex = 1, 3 do
