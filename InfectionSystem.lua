@@ -1455,20 +1455,20 @@ local function setCylinderBetween(part, pointA, pointB, thickness)
   local length = math.max(difference.Magnitude, 0.05)
   local axis = difference.Unit
 
-  -- Roblox Cylinder parts use local Y as their length axis.
-  local right = Vector3.yAxis:Cross(axis)
-  if right.Magnitude < 0.05 then
-    right = Vector3.xAxis - axis * axis.X
+  -- Roblox Cylinder parts extend along their local X axis.
+  local up = Vector3.yAxis - axis * axis.Y
+  if up.Magnitude < 0.05 then
+    up = Vector3.zAxis - axis * axis.Z
   end
-  right = right.Unit
-  local back = right:Cross(axis).Unit
+  up = up.Unit
+  local side = axis:Cross(up).Unit
 
-  part.Size = Vector3.new(thickness, length, thickness)
+  part.Size = Vector3.new(length, thickness, thickness)
   part.CFrame = CFrame.fromMatrix(
     (pointA + pointB) * 0.5,
-    right,
     axis,
-    back
+    up,
+    side
   )
 end
 
