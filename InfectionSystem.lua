@@ -2890,45 +2890,125 @@ end
 
 local function crawlToNestTarget()
 	local target = workspace:FindFirstChild("InfectionNestTarget", true)
+	local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
+
 	if not target or not target:IsA("BasePart") then
 		warn("[INFECTION] Missing BasePart named InfectionNestTarget.")
 		return false
 	end
-	local path = PathfindingService:CreatePath({AgentRadius = 2, AgentHeight = 4, AgentCanJump = true, WaypointSpacing = 4})
-	local ok = pcall(function()
-		path:ComputeAsync(infectionBulb.Position, target.Position)
-	end)
-	if not ok or path.Status ~= Enum.PathStatus.Success then
-		warn("[INFECTION] Pathfinding could not reach InfectionNestTarget. Check that the marker is on a walkable floor.")
+	if not houseZone or not houseZone:IsA("BasePart") then
+		warn("[INFECTION] Missing BasePart named InfectionHouseZone. Add an invisible zone covering the house interior.")
 		return false
 	end
+
+	-- The nest marker must be inside the volume that identifies the house.
+	local markerLocal = houseZone.CFrame:PointToObjectSpace(target.Position)
+	local halfSize = houseZone.Size * 0.5
+	if math.abs(markerLocal.X) > halfSize.X
+		or math.abs(markerLocal.Y) > halfSize.Y
+		or math.abs(markerLocal.Z) > halfSize.Z then
+		warn("[INFECTION] InfectionNestTarget is outside InfectionHouseZone. Move the marker inside the zone.")
+		return false
+	end
+
+	-- Ignore the two invisible helper parts when finding the actual floor.
+	local floorParams = RaycastParams.new()
+	floorParams.FilterType = Enum.RaycastFilterType.Exclude
+	floorParams.FilterDescendantsInstances = {spawner, infectionFolder, target, houseZone}
+	floorParams.IgnoreWater = true
+
+	local function findFloor(position)
+		return workspace:Raycast(
+			position + Vector3.new(0, 8, 0),
+			Vector3.new(0, -60, 0),
+			floorParams
+		)
+	end
+
+	local startFloor = findFloor(infectionBulb.Position)
+	local targetFloor = findFloor(target.Position)
+	if not startFloor or not targetFloor then
+		warn("[INFECTION] Could not find the floor beneath the bulb or nest marker.")
+		return false
+	end
+
+	local path = PathfindingService:CreatePath({
+		AgentRadius = 2,
+		AgentHeight = 4,
+		AgentCanJump = true,
+		WaypointSpacing = 3
+	})
+	local pathStart = startFloor.Position + Vector3.new(0, 2, 0)
+	local pathFinish = targetFloor.Position + Vector3.new(0, 2, 0)
+	local ok = pcall(function()
+		path:ComputeAsync(pathStart, pathFinish)
+	end)
+	if not ok or path.Status ~= Enum.PathStatus.Success then
+		warn("[INFECTION] No walkable route to the house marker. Check the doorway and make sure the zone covers the interior.")
+		return false
+	end
+
 	local legs = {}
-	for i = 1, 4 do legs[i] = makeWalkerLeg() end
-	local current = infectionBulb.Position
-	print("[INFECTION] Stage 4: crawling toward InfectionNestTarget.")
+	for i = 1, 4 do
+		legs[i] = makeWalkerLeg()
+	end
+
+	local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 0.65)
+	local current = startFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
+	infectionBulb.Position = current
+	print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone.")
+
 	for _, waypoint in ipairs(path:GetWaypoints()) do
-		local destination = waypoint.Position + Vector3.new(0, 1.6, 0)
-		local distance = (destination - current).Magnitude
+		local waypointFloor = findFloor(waypoint.Position)
+		local floorPosition = waypointFloor and waypointFloor.Position or waypoint.Position
+		local destination = floorPosition + Vector3.new(0, bulbRadius + 0.12, 0)
+		local segmentStart = current
+		local distance = (destination - segmentStart).Magnitude
 		local steps = math.max(1, math.ceil(distance / 0.22))
+
 		for step = 1, steps do
-			if not infectionBulb or not infectionBulb.Parent then break end
-			local nextPosition = current:Lerp(destination, step / steps)
-			local facing = destination - current
+			if not infectionBulb or not infectionBulb.Parent then
+				for _, leg in ipairs(legs) do if leg and leg.Parent then leg:Destroy() end end
+				return false
+			end
+
+			local alpha = step / steps
+			local nextPosition = segmentStart:Lerp(destination, alpha)
+			local facing = destination - segmentStart
 			if facing.Magnitude < 0.05 then facing = Vector3.new(0, 0, 1) end
-			infectionBulb.CFrame = CFrame.lookAt(nextPosition + Vector3.new(0, math.sin(os.clock() * 6) * 0.1, 0), nextPosition + facing.Unit)
+			local bob = math.sin(os.clock() * 7) * 0.07
+			infectionBulb.CFrame = CFrame.lookAt(
+				nextPosition + Vector3.new(0, bob, 0),
+				nextPosition + facing.Unit
+			)
+
 			for legIndex, leg in ipairs(legs) do
 				local angle = (legIndex - 1) * math.pi * 0.5
-				local hip = infectionBulb.Position + Vector3.new(math.cos(angle) * 0.95, -0.2, math.sin(angle) * 0.95)
-				local stride = math.sin(os.clock() * 6 + legIndex * math.pi) * 0.55
-				local foot = hip + Vector3.new(math.cos(angle) * (1.25 + stride), -1.35 + math.max(0, stride) * 0.45, math.sin(angle) * (1.25 + stride))
+				local hip = infectionBulb.Position
+					+ Vector3.new(math.cos(angle) * 1.0, -0.25, math.sin(angle) * 1.0)
+				local stride = math.sin(os.clock() * 7 + legIndex * math.pi) * 0.45
+				local foot = hip + Vector3.new(
+					math.cos(angle) * (1.15 + stride),
+					-bulbRadius + 0.05 + math.max(0, stride) * 0.3,
+					math.sin(angle) * (1.15 + stride)
+				)
 				setCylinderBetween(leg, hip, foot, 0.42)
 			end
-			task.wait(0.08)
+			task.wait(0.06)
 		end
 		current = destination
 	end
-	for _, leg in ipairs(legs) do if leg and leg.Parent then leg:Destroy() end end
-	return (infectionBulb.Position - (target.Position + Vector3.new(0, 1.6, 0))).Magnitude < 10
+
+	for _, leg in ipairs(legs) do
+		if leg and leg.Parent then leg:Destroy() end
+	end
+
+	local finalFloor = findFloor(target.Position)
+	if finalFloor then
+		local settledPosition = finalFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
+		infectionBulb.Position = settledPosition
+	end
+	return (infectionBulb.Position - (targetFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0))).Magnitude < 10
 end
 
 local function formStageFiveNest()
