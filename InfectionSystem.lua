@@ -50,6 +50,7 @@ local GROUND_STALK_SCAN_INTERVAL = 0.35
 local GROUND_STALK_SPAWN_COOLDOWN = 6.5
 local GROUND_STALK_GRAB_COOLDOWN = 12.0
 local stageThreeStartedAt = nil
+local stageClock = os.clock()
 local GROUND_STALK_DESPAWN_DISTANCE = 24
 local GROUND_STALK_DESPAWN_CHANCE = 0.45
 
@@ -3547,7 +3548,7 @@ local function startStageFourRelocation()
 end
 
 local function runInfectionStageController()
-	local stageClock = os.clock()
+	stageClock = os.clock()
 	while infectionFolder.Parent and growthStage < 4 do
 		task.wait(2)
 		local elapsed = os.clock() - stageClock
@@ -3585,12 +3586,38 @@ end
 
 local function handleDeveloperChatCommand(player, message)
 	local requestedStage = message:match("^%s*/stage%s+(%d+)%s*$")
-	if requestedStage ~= "4" then return end
+	if requestedStage ~= "3" and requestedStage ~= "4" then return end
 
 	if stageFourTransitionRunning then
-		warn("[INFECTION] Stage 4 transition is already running.")
+		warn("[INFECTION] A Stage 4 transition is already running.")
 		return
 	end
+
+	if requestedStage == "3" then
+		if growthStage >= 4 then
+			warn("[INFECTION] Cannot set Stage 3 after relocation has started.")
+			return
+		end
+
+		local wasAlreadyStageThree = growthStage == 3
+		growthStage = 3
+		relocationStarted = false
+		stageClock = os.clock()
+		stageThreeStartedAt = stageClock
+		setBulbSize(3.8, 3)
+
+		if not wasAlreadyStageThree then
+			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+			for index = 1, 8 do
+				local angle = (index - 1) * math.pi * 0.25
+				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
+			end
+		end
+
+		print("[INFECTION] " .. player.Name .. " used /stage 3. Mature growth started; the Stage 4 timer has been reset.")
+		return
+	end
+
 	if growthStage >= 4 then
 		warn("[INFECTION] The parasite has already reached Stage " .. tostring(growthStage) .. ".")
 		return
