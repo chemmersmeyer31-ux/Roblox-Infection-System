@@ -327,6 +327,8 @@ local function makeCrawler(startPosition, startNormal)
         if escortActive and not visibleTarget and state ~= "leap"
             and state ~= "cling" and state ~= "retreat" then
             state = "escort"
+            targetInfo = nil
+            lastKnownPosition = nil
         elseif visibleTarget and state == "escort" then
             setState("stalk", rng:NextNumber(2.5, 4.5))
         end
