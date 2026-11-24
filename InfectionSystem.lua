@@ -3463,10 +3463,10 @@ local function formStageFiveNest()
     if actualFloor and actualFloor.Normal.Y > 0.82 then
       local base = actualFloor.Position + actualFloor.Normal * 0.08
       local insideBulb = infectionBulb.Position
-        - Vector3.new(0, bulbRadius * 0.48, 0) + radial * (bulbRadius * 0.24)
+        - Vector3.new(0, bulbRadius * 0.68, 0) + radial * (bulbRadius * 0.18)
       local support = growStageFiveVine(
         "Stage5RootSupport" .. index, base, insideBulb,
-        0.78, rng:NextNumber(3.2, 4.0)
+        0.92, rng:NextNumber(3.2, 4.0)
       )
       table.insert(rootTips, {position = base, direction = radial, support = support})
 
@@ -3485,30 +3485,33 @@ local function formStageFiveNest()
         )
       end
 
-      -- Three low, branching runners crawl outward from every support base.
+      -- Three substantial ground runners spread directly from each pillar.
+      -- Raycasts begin just above the current floor level and reach farther
+      -- down, so the vines stay attached across uneven ground.
       for branchIndex = 1, 3 do
         local spread = (branchIndex - 2) * math.rad(52)
         local direction = CFrame.fromAxisAngle(Vector3.yAxis, spread):VectorToWorldSpace(radial)
-        local distance = rng:NextNumber(5.5, 8.5)
+        local distance = rng:NextNumber(8, 11)
         local previous = base
-        for segmentIndex = 1, 4 do
-          local alpha = segmentIndex / 4
-          local drift = Vector3.new(0, 0, 0)
-          if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.35) end
-          if segmentIndex == 3 then drift = Vector3.new(0, 0, -0.25) end
-          local probe = base + direction * (distance * alpha) + drift + Vector3.new(0, 2, 0)
-          local ground = workspace:Raycast(probe, Vector3.new(0, -8, 0), floorParams)
+        for segmentIndex = 1, 5 do
+          local alpha = segmentIndex / 5
+          local drift = Vector3.zero
+          if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.3) end
+          if segmentIndex == 4 then drift = Vector3.new(0, 0, -0.3) end
+          local target = base + direction * (distance * alpha) + drift
+          local probe = Vector3.new(target.X, previous.Y + 4, target.Z)
+          local ground = workspace:Raycast(probe, Vector3.new(0, -30, 0), floorParams)
+
           if ground and ground.Normal.Y > 0.82 then
-            local nextPoint = ground.Position + ground.Normal * 0.07
+            local nextPoint = ground.Position + ground.Normal * 0.1
             growStageFiveVine(
               "Stage5GroundCrawlerVine", previous, nextPoint,
-              math.max(0.13, 0.28 - segmentIndex * 0.025),
-              rng:NextNumber(0.65, 1.0)
+              math.max(0.24, 0.36 - segmentIndex * 0.025),
+              rng:NextNumber(0.8, 1.15)
             )
 
-            -- Put eggs directly along the visible runner, like growths
-            -- attached to the infection instead of scattered nearby.
-            if segmentIndex == 2 or segmentIndex == 4 then
+            -- Egg markers sit on the runner itself, not beside it.
+            if segmentIndex == 2 or segmentIndex == 5 then
               local eggPoint = Instance.new("Part")
               eggPoint.Name = "EggPoint"
               eggPoint.Anchored = true
@@ -3522,10 +3525,12 @@ local function formStageFiveNest()
             end
 
             previous = nextPoint
+          else
+            warn("[INFECTION] Stage 5 ground runner could not find floor for segment " .. segmentIndex)
+            break
           end
         end
-      end
-    end
+      end    end
     task.wait(0.3)
   end
 
