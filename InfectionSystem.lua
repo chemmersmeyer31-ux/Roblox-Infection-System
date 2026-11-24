@@ -3530,7 +3530,8 @@ local function formStageFiveNest()
             break
           end
         end
-      end    end
+      end
+    end
     task.wait(0.3)
   end
 
