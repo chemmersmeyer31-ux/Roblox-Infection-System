@@ -2468,44 +2468,48 @@ local function performInfectedDescent(
 	destroyHoistVines(hoistVines)
 	print("[INFECTION] Ceiling vines released. Lowering the visible infected character.")
 
-	-- New support tendrils stay visibly connected from the ceiling to the parasite.
-	local descentVines = createDescentVines()
-	local descentAnchor = roofResult and roofResult.Position
-		or (infectedRoot.Position + Vector3.new(0, INFECTED_DESCENT_DISTANCE + 8, 0))
+	-- Only perform the hanging descent when a real ceiling was found and
+	-- the cocoon was actually hoisted. Ground-mounted outdoor cocoons must
+	-- release the infected character where it was captured, not lower it
+	-- through the floor.
+	if roofResult then
+		local descentVines = createDescentVines()
+		local descentAnchor = roofResult.Position
 
-	-- Move the actual infected rig down; there is no invisible placeholder/pop-in.
-	local startPivot = infectedCharacter:GetPivot()
-	local descentStart = os.clock()
+		local startPivot = infectedCharacter:GetPivot()
+		local descentStart = os.clock()
 
-	while os.clock() - descentStart < INFECTED_DESCENT_TIME do
-		if not infectedCharacter.Parent or not infectedRoot.Parent then
-			return false
+		while os.clock() - descentStart < INFECTED_DESCENT_TIME do
+			if not infectedCharacter.Parent or not infectedRoot.Parent then
+				destroyDescentVines(descentVines)
+				return false
+			end
+
+			local alpha = math.clamp(
+				(os.clock() - descentStart) / INFECTED_DESCENT_TIME,
+				0,
+				1
+			)
+			local easedAlpha = alpha * alpha * (3 - 2 * alpha)
+			local offset = Vector3.new(
+				0,
+				-INFECTED_DESCENT_DISTANCE * easedAlpha,
+				0
+			)
+
+			infectedCharacter:PivotTo(startPivot + offset)
+			updateDescentVines(descentVines, infectedRoot, descentAnchor)
+			task.wait(0.035)
 		end
 
-		local alpha = math.clamp(
-			(os.clock() - descentStart) / INFECTED_DESCENT_TIME,
-			0,
-			1
+		infectedCharacter:PivotTo(
+			startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
 		)
-		local easedAlpha = alpha * alpha * (3 - 2 * alpha)
-		local offset = Vector3.new(
-			0,
-			-INFECTED_DESCENT_DISTANCE * easedAlpha,
-			0
-		)
-
-		infectedCharacter:PivotTo(startPivot + offset)
 		updateDescentVines(descentVines, infectedRoot, descentAnchor)
-		task.wait(0.035)
+		destroyDescentVines(descentVines)
+	else
+		print("[INFECTION] No ceiling hoist was used. Releasing infected character at ground level.")
 	end
-
-	infectedCharacter:PivotTo(
-		startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
-	)
-	updateDescentVines(descentVines, infectedRoot, descentAnchor)
-
-	-- Remove the ceiling tethers only after the parasite reaches its landing point.
-	destroyDescentVines(descentVines)
 
 	-- The parasite is now released and can move normally.
 	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
