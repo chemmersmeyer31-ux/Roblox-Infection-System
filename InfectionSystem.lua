@@ -63,6 +63,7 @@ local groundStalks = {}
 
 local activeGrabCount = 0
 local lastGroundStalkSpawn = 0
+local infectedPlayers = {}
 
 --------------------------------------------------
 -- SPAWNER
@@ -640,6 +641,7 @@ local function runGroundStalkSystem()
 						humanoid and Players:GetPlayerFromCharacter(character)
 
 					if player and humanoid and humanoid.Health > 0
+						and not infectedPlayers[player]
 						and attemptPlayerGrab then
 
 						stalk.grabbed = true
@@ -1301,7 +1303,7 @@ local HOIST_VINE_COUNT = 3
 local HOIST_VINE_SEGMENTS = 10
 local HOIST_VINE_FORM_TIME = 4.0
 local HOIST_DURATION = 5.5
-local HOIST_DISTANCE_BELOW_ROOF = 2.0
+local HOIST_DISTANCE_BELOW_ROOF = 1.5
 local HOIST_VINE_THICKNESS = 0.28
 
 -- Transformation and descent settings.
@@ -2049,9 +2051,13 @@ local function performCeilingHoist(
 	print("[INFECTION] Ceiling vines attached. Beginning cocoon hoist.")
 
 	local hoistStartCFrame = root.CFrame
+	-- The root is near the cocoon's center, so leave room for the cocoon's
+	-- entire upper half plus a small visible gap beneath the ceiling.
+	local cocoonTopClearance =
+		(cocoonData.targetSize.Y * 0.5) + HOIST_DISTANCE_BELOW_ROOF
 	local availableHeight =
 		roofResult.Position.Y - root.Position.Y
-	- HOIST_DISTANCE_BELOW_ROOF
+	- cocoonTopClearance
 
 	local liftDistance = math.max(0, availableHeight)
 
@@ -2266,10 +2272,11 @@ end
 local function createDescentVines()
 	local vines = {}
 
+	-- These points attach around the upper body of the visible infected rig.
 	local offsets = {
-		Vector3.new(-1.1, 0, -0.8),
-		Vector3.new(1.1, 0, -0.8),
-		Vector3.new(0, 0, 1.2)
+		Vector3.new(-1.1, 1.25, -0.8),
+		Vector3.new(1.1, 1.25, -0.8),
+		Vector3.new(0, 1.15, 1.2)
 	}
 
 	for vineIndex = 1, DESCENT_VINE_COUNT do
@@ -2281,7 +2288,7 @@ local function createDescentVines()
 				DESCENT_VINE_THICKNESS
 			)
 
-			part.Transparency = 1
+			part.Transparency = 0
 			table.insert(parts, part)
 		end
 
@@ -2294,38 +2301,42 @@ local function createDescentVines()
 	return vines
 end
 
-local function updateDescentVines(
-	vines,
-	placeholder,
-	anchorPosition,
-	alpha
-)
-	if not placeholder.Parent then return end
+local function updateDescentVines(vines, infectedRoot, anchorPosition)
+	if not infectedRoot or not infectedRoot.Parent then return end
 
 	for _, vine in ipairs(vines) do
-		local startPoint = anchorPosition + vine.offset
-		local endPoint = placeholder.Position + vine.offset
+		-- Start at the ceiling and finish directly on the moving parasite.
+		local startPoint = anchorPosition + Vector3.new(
+			vine.offset.X,
+			-0.12,
+			vine.offset.Z
+		)
+		local endPoint = infectedRoot.CFrame:PointToWorldSpace(vine.offset)
 
 		for index, part in ipairs(vine.parts) do
 			local t0 = (index - 1) / DESCENT_VINE_SEGMENTS
 			local t1 = index / DESCENT_VINE_SEGMENTS
+			local pointA = startPoint:Lerp(endPoint, t0)
+			local pointB = startPoint:Lerp(endPoint, t1)
 
-			if t0 < alpha then
-				local visibleEnd = math.min(t1, alpha)
+			part.Transparency = 0
+			setCylinderBetween(
+				part,
+				pointA,
+				pointB,
+				DESCENT_VINE_THICKNESS
+			)
+		end
+	end
+end
 
-				local pointA = startPoint:Lerp(endPoint, t0)
-				local pointB = startPoint:Lerp(endPoint, visibleEnd)
+local function destroyDescentVines(vines)
+	if not vines then return end
 
-				part.Transparency = 0
-
-				setCylinderBetween(
-					part,
-					pointA,
-					pointB,
-					DESCENT_VINE_THICKNESS
-				)
-			else
-				part.Transparency = 1
+	for _, vine in ipairs(vines) do
+		for _, part in ipairs(vine.parts) do
+			if part and part.Parent then
+				part:Destroy()
 			end
 		end
 	end
@@ -2393,6 +2404,9 @@ local function performInfectedDescent(
 		return false
 	end
 
+	-- Ground stalks must never capture this player again after transformation.
+	infectedPlayers[player] = true
+
 	local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
 	local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
 	if not infectedRoot or not infectedHumanoid then
@@ -2441,6 +2455,11 @@ local function performInfectedDescent(
 	destroyHoistVines(hoistVines)
 	print("[INFECTION] Ceiling vines released. Lowering the visible infected character.")
 
+	-- New support tendrils stay visibly connected from the ceiling to the parasite.
+	local descentVines = createDescentVines()
+	local descentAnchor = roofResult and roofResult.Position
+		or (infectedRoot.Position + Vector3.new(0, INFECTED_DESCENT_DISTANCE + 8, 0))
+
 	-- Move the actual infected rig down; there is no invisible placeholder/pop-in.
 	local startPivot = infectedCharacter:GetPivot()
 	local descentStart = os.clock()
@@ -2463,12 +2482,17 @@ local function performInfectedDescent(
 		)
 
 		infectedCharacter:PivotTo(startPivot + offset)
+		updateDescentVines(descentVines, infectedRoot, descentAnchor)
 		task.wait(0.035)
 	end
 
 	infectedCharacter:PivotTo(
 		startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
 	)
+	updateDescentVines(descentVines, infectedRoot, descentAnchor)
+
+	-- Remove the ceiling tethers only after the parasite reaches its landing point.
+	destroyDescentVines(descentVines)
 
 	-- The parasite is now released and can move normally.
 	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
@@ -2500,6 +2524,7 @@ end
 --------------------------------------------------
 
 attemptPlayerGrab = function(anchor, player, character, humanoid, root)
+	if infectedPlayers[player] then return end
 	if activeGrabCount >= MAX_ACTIVE_GRABS or anchor.used then return end
 	if not character.Parent or humanoid.Health <= 0 then return end
 
