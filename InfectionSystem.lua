@@ -2370,7 +2370,11 @@ local function performInfectedDescent(
 
 	while os.clock() - hangStart < POST_HOIST_HANG_TIME do
 		if not character.Parent or not root.Parent then
-			return
+			infectedCharacter:Destroy()
+			if character.Parent then
+				restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
+			end
+			return false
 		end
 
 		updateCocoonEntanglement(finalEntanglement, root, 1)
@@ -2384,7 +2388,11 @@ local function performInfectedDescent(
 	end
 
 	if not character.Parent or not root.Parent then
-		return
+		infectedCharacter:Destroy()
+		if character.Parent then
+			restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
+		end
+		return false
 	end
 
 	print("[INFECTION] Cocoon beginning to retract.")
@@ -2397,7 +2405,11 @@ local function performInfectedDescent(
 	destroyHoistVines(hoistVines)
 
 	if not character.Parent or not root.Parent then
-		return
+		infectedCharacter:Destroy()
+		if character.Parent then
+			restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
+		end
+		return false
 	end
 
 	-- Create the invisible placeholder at the captured player's position.
@@ -2440,7 +2452,11 @@ local function performInfectedDescent(
 	while os.clock() - vineStart < 1.5 do
 		if not placeholder.Parent then
 			destroyDescentVines(descentVines)
-			return
+			infectedCharacter:Destroy()
+			if character.Parent then
+				restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
+			end
+			return false
 		end
 
 		local alpha = math.clamp(
