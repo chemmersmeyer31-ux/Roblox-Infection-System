@@ -73,9 +73,7 @@ local activeGrabCount = 0
 local infectionGrowthBoosts = 0
 local GROWTH_BOOST_MULTIPLIER = 15
 local GROWTH_BOOST_DURATION = 60
-local GROWTH_BOOST_COOLDOWN = 4
 local growthBoostUntil = 0
-local lastGrowthBoostAt = -math.huge
 local lastGroundStalkSpawn = 0
 local infectedPlayers = {}
 
@@ -3568,12 +3566,10 @@ local function runGrowthBoostPartWatcher()
 		end
 
 		if touching and not wasTouching then
-			local now = os.clock()
-			if now - lastGrowthBoostAt >= GROWTH_BOOST_COOLDOWN then
-				lastGrowthBoostAt = now
-				growthBoostUntil = now + GROWTH_BOOST_DURATION
-				print("[INFECTION] Growth accelerator touched! Growth speed increased 15x for 60 seconds.")
-			end
+			-- This is a developer testing zone: every fresh entry can trigger
+			-- the boost immediately, with no cooldown between activations.
+			growthBoostUntil = os.clock() + GROWTH_BOOST_DURATION
+			print("[INFECTION] Developer growth zone touched! Growth speed increased 15x for 60 seconds.")
 		end
 
 		wasTouching = touching
