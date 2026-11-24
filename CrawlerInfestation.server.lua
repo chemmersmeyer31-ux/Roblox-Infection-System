@@ -314,6 +314,13 @@ local function makeCrawler(startPosition, startNormal)
         local targetDistance = targetRoot and (targetRoot.Position - position).Magnitude or math.huge
         local ignoreCharacter = activeTarget and activeTarget.character
 
+        -- Recover cleanly if the player resets or disappears during a leap/cling.
+        if state == "leap" and (not targetRoot or not targetTorso) then
+            setState("investigate", 1.5)
+        elseif state == "cling" and (not targetRoot or not targetTorso) then
+            stateUntil = now
+        end
+
         if state == "cling" and targetRoot and targetTorso and now < stateUntil then
             local progress = math.clamp((now - clingStarted) / clingDuration, 0, 1)
             local orbit = math.sin(progress * math.pi * 2) * 0.18
