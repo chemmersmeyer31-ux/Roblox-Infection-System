@@ -88,7 +88,7 @@ local spawner = workspace:WaitForChild("InfectionSpawner")
 
 local oldFolder = workspace:FindFirstChild("GeneratedInfection")
 if oldFolder then
-	oldFolder:Destroy()
+  oldFolder:Destroy()
 end
 
 local infectionFolder = Instance.new("Folder")
@@ -105,12 +105,12 @@ rayParams.FilterDescendantsInstances = {spawner, infectionFolder}
 rayParams.IgnoreWater = true
 
 local directions = {
-	Vector3.new(1, 0, 0),
-	Vector3.new(-1, 0, 0),
-	Vector3.new(0, 1, 0),
-	Vector3.new(0, -1, 0),
-	Vector3.new(0, 0, 1),
-	Vector3.new(0, 0, -1)
+  Vector3.new(1, 0, 0),
+  Vector3.new(-1, 0, 0),
+  Vector3.new(0, 1, 0),
+  Vector3.new(0, -1, 0),
+  Vector3.new(0, 0, 1),
+  Vector3.new(0, 0, -1)
 }
 
 --------------------------------------------------
@@ -118,113 +118,113 @@ local directions = {
 --------------------------------------------------
 
 local function getCellKey(position)
-	local x = math.floor(position.X / OCCUPANCY_CELL_SIZE)
-	local y = math.floor(position.Y / OCCUPANCY_CELL_SIZE)
-	local z = math.floor(position.Z / OCCUPANCY_CELL_SIZE)
-	return x .. ":" .. y .. ":" .. z, x, y, z
+  local x = math.floor(position.X / OCCUPANCY_CELL_SIZE)
+  local y = math.floor(position.Y / OCCUPANCY_CELL_SIZE)
+  local z = math.floor(position.Z / OCCUPANCY_CELL_SIZE)
+  return x .. ":" .. y .. ":" .. z, x, y, z
 end
 
 local function canPlaceSegment(startPosition, endPosition, thickness)
-	local difference = endPosition - startPosition
-	local length = difference.Magnitude
+  local difference = endPosition - startPosition
+  local length = difference.Magnitude
 
-	if length < 0.05 then
-		return false
-	end
+  if length < 0.05 then
+    return false
+  end
 
-	local spacing = math.max(MIN_SPACING, thickness * 1.35)
-	local connectionLength = 0.38
-	local sampleCount = math.max(4, math.ceil(length / 0.28))
+  local spacing = math.max(MIN_SPACING, thickness * 1.35)
+  local connectionLength = 0.38
+  local sampleCount = math.max(4, math.ceil(length / 0.28))
 
-	for sampleIndex = 2, sampleCount do
-		local alpha = sampleIndex / sampleCount
-		local sample = startPosition + difference * alpha
-		local distanceFromStart = length * alpha
+  for sampleIndex = 2, sampleCount do
+    local alpha = sampleIndex / sampleCount
+    local sample = startPosition + difference * alpha
+    local distanceFromStart = length * alpha
 
-		if distanceFromStart > connectionLength then
-			local _, cx, cy, cz = getCellKey(sample)
-			local cellRadius = math.ceil(spacing / OCCUPANCY_CELL_SIZE) + 1
+    if distanceFromStart > connectionLength then
+      local _, cx, cy, cz = getCellKey(sample)
+      local cellRadius = math.ceil(spacing / OCCUPANCY_CELL_SIZE) + 1
 
-			for x = cx - cellRadius, cx + cellRadius do
-				for y = cy - cellRadius, cy + cellRadius do
-					for z = cz - cellRadius, cz + cellRadius do
-						local bucket = occupiedPositions[
-						x .. ":" .. y .. ":" .. z
-						]
+      for x = cx - cellRadius, cx + cellRadius do
+        for y = cy - cellRadius, cy + cellRadius do
+          for z = cz - cellRadius, cz + cellRadius do
+            local bucket = occupiedPositions[
+            x .. ":" .. y .. ":" .. z
+            ]
 
-						if bucket then
-							for _, occupied in ipairs(bucket) do
-								local isParentConnection =
-									(occupied - startPosition).Magnitude
-									<= connectionLength
+            if bucket then
+              for _, occupied in ipairs(bucket) do
+                local isParentConnection =
+                  (occupied - startPosition).Magnitude
+                  <= connectionLength
 
-								if not isParentConnection
-									and (sample - occupied).Magnitude < spacing then
-									return false
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end
+                if not isParentConnection
+                  and (sample - occupied).Magnitude < spacing then
+                  return false
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
 
-	return true
+  return true
 end
 
 local function registerSegment(startPosition, endPosition)
-	local difference = endPosition - startPosition
-	local length = difference.Magnitude
-	local sampleCount = math.max(2, math.ceil(length / 0.28))
+  local difference = endPosition - startPosition
+  local length = difference.Magnitude
+  local sampleCount = math.max(2, math.ceil(length / 0.28))
 
-	for sampleIndex = 0, sampleCount do
-		local alpha = sampleIndex / sampleCount
-		local sample = startPosition + difference * alpha
-		local key = getCellKey(sample)
+  for sampleIndex = 0, sampleCount do
+    local alpha = sampleIndex / sampleCount
+    local sample = startPosition + difference * alpha
+    local key = getCellKey(sample)
 
-		if not occupiedPositions[key] then
-			occupiedPositions[key] = {}
-		end
+    if not occupiedPositions[key] then
+      occupiedPositions[key] = {}
+    end
 
-		table.insert(occupiedPositions[key], sample)
-	end
+    table.insert(occupiedPositions[key], sample)
+  end
 end
 
 local function registerGroundAnchor(position, normal)
-	if normal.Y < 0.82 then return end
-	if position.Y > spawner.Position.Y + 6 then return end
-	if #groundAnchors >= MAX_GROUND_ANCHORS then return end
+  if normal.Y < 0.82 then return end
+  if position.Y > spawner.Position.Y + 6 then return end
+  if #groundAnchors >= MAX_GROUND_ANCHORS then return end
 
-	for _, anchor in ipairs(groundAnchors) do
-		if (anchor.position - position).Magnitude < 3.5 then
-			return
-		end
-	end
+  for _, anchor in ipairs(groundAnchors) do
+    if (anchor.position - position).Magnitude < 3.5 then
+      return
+    end
+  end
 
-	table.insert(groundAnchors, {
-		position = position,
-		used = false
-	})
+  table.insert(groundAnchors, {
+    position = position,
+    used = false
+  })
 end
 
 local MAX_CEILING_ANCHORS = 40
 local CEILING_ANCHOR_SPACING = 4.5
 
 local function registerCeilingAnchor(position, normal)
-	if normal.Y > -0.72 then return end
-	if #ceilingAnchors >= MAX_CEILING_ANCHORS then return end
+  if normal.Y > -0.72 then return end
+  if #ceilingAnchors >= MAX_CEILING_ANCHORS then return end
 
-	for _, anchor in ipairs(ceilingAnchors) do
-		if (anchor.position - position).Magnitude < CEILING_ANCHOR_SPACING then
-			return
-		end
-	end
+  for _, anchor in ipairs(ceilingAnchors) do
+    if (anchor.position - position).Magnitude < CEILING_ANCHOR_SPACING then
+      return
+    end
+  end
 
-	table.insert(ceilingAnchors, {
-		position = position,
-		used = false
-	})
+  table.insert(ceilingAnchors, {
+    position = position,
+    used = false
+  })
 end
 
 --------------------------------------------------
@@ -232,28 +232,28 @@ end
 --------------------------------------------------
 
 local function findStartingSurface()
-	local bestHit = nil
-	local bestDistance = math.huge
+  local bestHit = nil
+  local bestDistance = math.huge
 
-	for _, direction in ipairs(directions) do
-		local origin = spawner.Position + direction * 0.5
-		local result = workspace:Raycast(
-			origin,
-			-direction * 12,
-			rayParams
-		)
+  for _, direction in ipairs(directions) do
+    local origin = spawner.Position + direction * 0.5
+    local result = workspace:Raycast(
+      origin,
+      -direction * 12,
+      rayParams
+    )
 
-		if result then
-			local distance = (result.Position - spawner.Position).Magnitude
+    if result then
+      local distance = (result.Position - spawner.Position).Magnitude
 
-			if distance < bestDistance then
-				bestDistance = distance
-				bestHit = result
-			end
-		end
-	end
+      if distance < bestDistance then
+        bestDistance = distance
+        bestHit = result
+      end
+    end
+  end
 
-	return bestHit
+  return bestHit
 end
 
 --------------------------------------------------
@@ -261,25 +261,25 @@ end
 --------------------------------------------------
 
 local function getRandomColor()
-	local color = MAIN_COLOR:Lerp(LIGHT_COLOR, rng:NextNumber())
+  local color = MAIN_COLOR:Lerp(LIGHT_COLOR, rng:NextNumber())
 
-	if rng:NextNumber() < 0.3 then
-		color = color:Lerp(DARK_COLOR, rng:NextNumber(0.2, 0.6))
-	end
+  if rng:NextNumber() < 0.3 then
+    color = color:Lerp(DARK_COLOR, rng:NextNumber(0.2, 0.6))
+  end
 
-	return color
+  return color
 end
 
 local function getThickness(depth)
-	if depth == 0 then
-		return rng:NextNumber(0.28, 0.43)
-	elseif depth == 1 then
-		return rng:NextNumber(0.17, 0.29)
-	elseif depth == 2 then
-		return rng:NextNumber(0.11, 0.20)
-	else
-		return rng:NextNumber(0.08, 0.15)
-	end
+  if depth == 0 then
+    return rng:NextNumber(0.28, 0.43)
+  elseif depth == 1 then
+    return rng:NextNumber(0.17, 0.29)
+  elseif depth == 2 then
+    return rng:NextNumber(0.11, 0.20)
+  else
+    return rng:NextNumber(0.08, 0.15)
+  end
 end
 
 --------------------------------------------------
@@ -287,105 +287,105 @@ end
 --------------------------------------------------
 
 local function createSegment(startPosition, endPosition, faceNormal, thickness)
-	local difference = endPosition - startPosition
-	local length = difference.Magnitude
+  local difference = endPosition - startPosition
+  local length = difference.Magnitude
 
-	if length < 0.05 then return nil end
+  if length < 0.05 then return nil end
 
-	local direction = difference.Unit
-	local up = faceNormal - direction * faceNormal:Dot(direction)
+  local direction = difference.Unit
+  local up = faceNormal - direction * faceNormal:Dot(direction)
 
-	if up.Magnitude < 0.01 then return nil end
-	up = up.Unit
+  if up.Magnitude < 0.01 then return nil end
+  up = up.Unit
 
-	local side = direction:Cross(up)
-	if side.Magnitude < 0.01 then return nil end
-	side = side.Unit
+  local side = direction:Cross(up)
+  if side.Magnitude < 0.01 then return nil end
+  side = side.Unit
 
-	local depth = rng:NextNumber(0.10, 0.19)
+  local depth = rng:NextNumber(0.10, 0.19)
 
-	local baseSize = Vector3.new(
-		length + math.max(depth, thickness) * 1.15,
-		depth * 1.25,
-		thickness * 1.25
-	)
+  local baseSize = Vector3.new(
+    length + math.max(depth, thickness) * 1.15,
+    depth * 1.25,
+    thickness * 1.25
+  )
 
-	local middlePosition =
-		(startPosition + endPosition) / 2 + up * (depth / 2)
+  local middlePosition =
+    (startPosition + endPosition) / 2 + up * (depth / 2)
 
-	local finalCFrame = CFrame.fromMatrix(
-		middlePosition,
-		direction,
-		up,
-		side
-	)
+  local finalCFrame = CFrame.fromMatrix(
+    middlePosition,
+    direction,
+    up,
+    side
+  )
 
-	local startCFrame = CFrame.fromMatrix(
-		startPosition + up * (depth / 2),
-		direction,
-		up,
-		side
-	)
+  local startCFrame = CFrame.fromMatrix(
+    startPosition + up * (depth / 2),
+    direction,
+    up,
+    side
+  )
 
-	local baseColor = getRandomColor()
+  local baseColor = getRandomColor()
 
-	local segment = Instance.new("Part")
-	segment.Name = "LivingTendril"
-	segment.Shape = Enum.PartType.Cylinder
-	segment.Material = Enum.Material.CorrodedMetal
-	segment.Color = baseColor
-	segment.Anchored = true
-	segment.CanCollide = false
-	segment.CanTouch = false
-	segment.CanQuery = false
-	segment.Size = Vector3.new(0.05, depth, thickness)
-	segment.CFrame = startCFrame
-	segment.Parent = infectionFolder
-	table.insert(growthSegments, segment)
+  local segment = Instance.new("Part")
+  segment.Name = "LivingTendril"
+  segment.Shape = Enum.PartType.Cylinder
+  segment.Material = Enum.Material.CorrodedMetal
+  segment.Color = baseColor
+  segment.Anchored = true
+  segment.CanCollide = false
+  segment.CanTouch = false
+  segment.CanQuery = false
+  segment.Size = Vector3.new(0.05, depth, thickness)
+  segment.CFrame = startCFrame
+  segment.Parent = infectionFolder
+  table.insert(growthSegments, segment)
 
-	local growthTween = TweenService:Create(
-		segment,
-		TweenInfo.new(
-			(os.clock() < growthBoostUntil) and (GROWTH_TIME / GROWTH_BOOST_MULTIPLIER) or GROWTH_TIME,
-			Enum.EasingStyle.Sine,
-			Enum.EasingDirection.Out
-		),
-		{
-			Size = baseSize,
-			CFrame = finalCFrame
-		}
-	)
+  local growthTween = TweenService:Create(
+    segment,
+    TweenInfo.new(
+      (os.clock() < growthBoostUntil) and (GROWTH_TIME / GROWTH_BOOST_MULTIPLIER) or GROWTH_TIME,
+      Enum.EasingStyle.Sine,
+      Enum.EasingDirection.Out
+    ),
+    {
+      Size = baseSize,
+      CFrame = finalCFrame
+    }
+  )
 
-	growthTween.Completed:Connect(function(state)
-		if state == Enum.PlaybackState.Completed and segment.Parent then
-			local pulseSize = Vector3.new(
-				baseSize.X,
-				baseSize.Y * (1 + PULSE_AMOUNT),
-				baseSize.Z * (1 + PULSE_AMOUNT)
-			)
+  growthTween.Completed:Connect(function(state)
+    if state == Enum.PlaybackState.Completed and segment.Parent then
+      local pulseSize = Vector3.new(
+        baseSize.X,
+        baseSize.Y * (1 + PULSE_AMOUNT),
+        baseSize.Z * (1 + PULSE_AMOUNT)
+      )
 
-			local pulseTween = TweenService:Create(
-				segment,
-				TweenInfo.new(
-					rng:NextNumber(PULSE_MIN_TIME, PULSE_MAX_TIME),
-					Enum.EasingStyle.Sine,
-					Enum.EasingDirection.InOut,
-					-1,
-					true,
-					rng:NextNumber(0, 1.5)
-				),
-				{
-					Size = pulseSize,
-					Color = baseColor:Lerp(LIGHT_COLOR, 0.16)
-				}
-			)
+      local pulseTween = TweenService:Create(
+        segment,
+        TweenInfo.new(
+          rng:NextNumber(PULSE_MIN_TIME, PULSE_MAX_TIME),
+          Enum.EasingStyle.Sine,
+          Enum.EasingDirection.InOut,
+          -1,
+          true,
+          rng:NextNumber(0, 1.5)
+        ),
+        {
+          Size = pulseSize,
+          Color = baseColor:Lerp(LIGHT_COLOR, 0.16)
+        }
+      )
 
-			pulseTween:Play()
-		end
-	end)
+      pulseTween:Play()
+    end
+  end)
 
-	growthTween:Play()
-	return segment
+  growthTween:Play()
+  return segment
 end
 
 --------------------------------------------------
@@ -393,33 +393,33 @@ end
 --------------------------------------------------
 
 local function getPlayerFacingDirection(position)
-	local nearestRoot = nil
-	local nearestDistance = math.huge
+  local nearestRoot = nil
+  local nearestDistance = math.huge
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
+  for _, player in ipairs(Players:GetPlayers()) do
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
 
-		if root then
-			local distance = (root.Position - position).Magnitude
+    if root then
+      local distance = (root.Position - position).Magnitude
 
-			if distance < nearestDistance then
-				nearestDistance = distance
-				nearestRoot = root
-			end
-		end
-	end
+      if distance < nearestDistance then
+        nearestDistance = distance
+        nearestRoot = root
+      end
+    end
+  end
 
-	if nearestRoot then
-		local difference = nearestRoot.Position - position
-		local horizontal = Vector3.new(difference.X, 0, difference.Z)
+  if nearestRoot then
+    local difference = nearestRoot.Position - position
+    local horizontal = Vector3.new(difference.X, 0, difference.Z)
 
-		if horizontal.Magnitude > 0.05 then
-			return horizontal.Unit
-		end
-	end
+    if horizontal.Magnitude > 0.05 then
+      return horizontal.Unit
+    end
+  end
 
-	return Vector3.new(0, 0, 1)
+  return Vector3.new(0, 0, 1)
 end
 
 --------------------------------------------------
@@ -427,28 +427,28 @@ end
 --------------------------------------------------
 
 local function findNearestPlayer(position, maxDistance)
-	local nearestRoot = nil
-	local nearestDistance = maxDistance
+  local nearestRoot = nil
+  local nearestDistance = maxDistance
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		local character = player.Character
-		local root = character and character:FindFirstChild("HumanoidRootPart")
+  for _, player in ipairs(Players:GetPlayers()) do
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
 
-		if root then
-			local offset = root.Position - position
-			local horizontalDistance =
-				Vector3.new(offset.X, 0, offset.Z).Magnitude
+    if root then
+      local offset = root.Position - position
+      local horizontalDistance =
+        Vector3.new(offset.X, 0, offset.Z).Magnitude
 
-			if math.abs(offset.Y) <= 12
-				and horizontalDistance < nearestDistance then
+      if math.abs(offset.Y) <= 12
+        and horizontalDistance < nearestDistance then
 
-				nearestRoot = root
-				nearestDistance = horizontalDistance
-			end
-		end
-	end
+        nearestRoot = root
+        nearestDistance = horizontalDistance
+      end
+    end
+  end
 
-	return nearestRoot, nearestDistance
+  return nearestRoot, nearestDistance
 end
 
 --------------------------------------------------
@@ -456,371 +456,371 @@ end
 --------------------------------------------------
 
 local function setRoundedStalkSegment(
-	part,
-	startPosition,
-	endPosition,
-	facingDirection,
-	radius
+  part,
+  startPosition,
+  endPosition,
+  facingDirection,
+  radius
 )
-	local difference = endPosition - startPosition
-	local length = difference.Magnitude
+  local difference = endPosition - startPosition
+  local length = difference.Magnitude
 
-	if length < 0.025 then
-		part.Transparency = 1
-		return
-	end
+  if length < 0.025 then
+    part.Transparency = 1
+    return
+  end
 
-	local axis = difference.Unit
-	local up = facingDirection - axis * facingDirection:Dot(axis)
+  local axis = difference.Unit
+  local up = facingDirection - axis * facingDirection:Dot(axis)
 
-	if up.Magnitude < 0.05 then
-		up = Vector3.new(1, 0, 0) - axis * axis.X
-	end
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(1, 0, 0) - axis * axis.X
+  end
 
-	if up.Magnitude < 0.05 then
-		up = Vector3.new(0, 0, 1) - axis * axis.Z
-	end
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(0, 0, 1) - axis * axis.Z
+  end
 
-	up = up.Unit
-	local side = axis:Cross(up)
+  up = up.Unit
+  local side = axis:Cross(up)
 
-	if side.Magnitude < 0.05 then
-		part.Transparency = 1
-		return
-	end
+  if side.Magnitude < 0.05 then
+    part.Transparency = 1
+    return
+  end
 
-	side = side.Unit
-	part.Transparency = 0
-	part.Size = Vector3.new(length + radius * 0.9, radius * 2, radius * 2)
-	part.CFrame = CFrame.fromMatrix(
-		(startPosition + endPosition) / 2,
-		axis,
-		up,
-		side
-	)
+  side = side.Unit
+  part.Transparency = 0
+  part.Size = Vector3.new(length + radius * 0.9, radius * 2, radius * 2)
+  part.CFrame = CFrame.fromMatrix(
+    (startPosition + endPosition) / 2,
+    axis,
+    up,
+    side
+  )
 end
 
 local function getGroundStalkLimit()
-	if growthStage == 5 then
-		return 5
-	elseif growthStage == 3 and stageThreeStartedAt then
-		local elapsed = os.clock() - stageThreeStartedAt
-		if elapsed >= 145 then return 4 end
-		if elapsed >= 95 then return 3 end
-		if elapsed >= 45 then return 2 end
-		return 1
-	end
-	return 0
+  if growthStage == 5 then
+    return 5
+  elseif growthStage == 3 and stageThreeStartedAt then
+    local elapsed = os.clock() - stageThreeStartedAt
+    if elapsed >= 145 then return 4 end
+    if elapsed >= 95 then return 3 end
+    if elapsed >= 45 then return 2 end
+    return 1
+  end
+  return 0
 end
 
 local function createGroundStalk(anchor, targetRoot)
-	local stalkLimit = getGroundStalkLimit()
-	if #groundStalks >= stalkLimit
-		or generatedCount + GROUND_STALK_SEGMENTS > MAX_SEGMENTS then
-		return false
-	end
+  local stalkLimit = getGroundStalkLimit()
+  if #groundStalks >= stalkLimit
+    or generatedCount + GROUND_STALK_SEGMENTS > MAX_SEGMENTS then
+    return false
+  end
 
-	for _, existing in ipairs(groundStalks) do
-		if (existing.anchor - anchor.position).Magnitude
-			< GROUND_STALK_MIN_SPACING then
-			anchor.used = true
-			return false
-		end
-	end
+  for _, existing in ipairs(groundStalks) do
+    if (existing.anchor - anchor.position).Magnitude
+      < GROUND_STALK_MIN_SPACING then
+      anchor.used = true
+      return false
+    end
+  end
 
-	local direction = Vector3.new(0, 0, 1)
-	if targetRoot and targetRoot.Parent then
-		local offset = targetRoot.Position - anchor.position
-		local horizontal = Vector3.new(offset.X, 0, offset.Z)
-		if horizontal.Magnitude > 0.05 then
-			direction = horizontal.Unit
-		end
-	end
+  local direction = Vector3.new(0, 0, 1)
+  if targetRoot and targetRoot.Parent then
+    local offset = targetRoot.Position - anchor.position
+    local horizontal = Vector3.new(offset.X, 0, offset.Z)
+    if horizontal.Magnitude > 0.05 then
+      direction = horizontal.Unit
+    end
+  end
 
-	-- A few low crawling runners extend toward the player first. The upright
-	-- stalk then rises from their tip, making the attack feel connected to
-	-- the existing ground network rather than appearing at the player's feet.
-	local crawlDistance = rng:NextNumber(3.5, 5.5)
-	local stalkPosition = anchor.position + direction * crawlDistance
-	local model = Instance.new("Model")
-	model.Name = "PlayerFacingGroundVine"
-	model.Parent = infectionFolder
+  -- A few low crawling runners extend toward the player first. The upright
+  -- stalk then rises from their tip, making the attack feel connected to
+  -- the existing ground network rather than appearing at the player's feet.
+  local crawlDistance = rng:NextNumber(3.5, 5.5)
+  local stalkPosition = anchor.position + direction * crawlDistance
+  local model = Instance.new("Model")
+  model.Name = "PlayerFacingGroundVine"
+  model.Parent = infectionFolder
 
-	local crawlerParts = {}
-	for index = 1, 4 do
-		local part = Instance.new("Part")
-		part.Name = "CrawlingRunner"
-		part.Shape = Enum.PartType.Cylinder
-		part.Material = Enum.Material.CorrodedMetal
-		part.Color = getRandomColor()
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 1
-		part.Size = Vector3.new(0.05, 0.22, 0.22)
-		part.Parent = model
-		table.insert(crawlerParts, part)
+  local crawlerParts = {}
+  for index = 1, 4 do
+    local part = Instance.new("Part")
+    part.Name = "CrawlingRunner"
+    part.Shape = Enum.PartType.Cylinder
+    part.Material = Enum.Material.CorrodedMetal
+    part.Color = getRandomColor()
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Transparency = 1
+    part.Size = Vector3.new(0.05, 0.22, 0.22)
+    part.Parent = model
+    table.insert(crawlerParts, part)
 
-		local alphaStart = (index - 1) / 4
-		local alphaEnd = index / 4
-		task.spawn(function()
-			task.wait((index - 1) * 0.16)
-			local began = os.clock()
-			while part.Parent and os.clock() - began < 0.48 do
-				local alpha = math.clamp((os.clock() - began) / 0.48, 0, 1)
-				local a = anchor.position:Lerp(stalkPosition, alphaStart)
-				local b = anchor.position:Lerp(stalkPosition, alphaStart + (alphaEnd - alphaStart) * alpha)
-				setRoundedStalkSegment(
-					part,
-					a + Vector3.new(0, 0.08, 0),
-					b + Vector3.new(0, 0.08, 0),
-					direction,
-					0.11
-				)
-				task.wait(0.04)
-			end
-		end)
-	end
+    local alphaStart = (index - 1) / 4
+    local alphaEnd = index / 4
+    task.spawn(function()
+      task.wait((index - 1) * 0.16)
+      local began = os.clock()
+      while part.Parent and os.clock() - began < 0.48 do
+        local alpha = math.clamp((os.clock() - began) / 0.48, 0, 1)
+        local a = anchor.position:Lerp(stalkPosition, alphaStart)
+        local b = anchor.position:Lerp(stalkPosition, alphaStart + (alphaEnd - alphaStart) * alpha)
+        setRoundedStalkSegment(
+          part,
+          a + Vector3.new(0, 0.08, 0),
+          b + Vector3.new(0, 0.08, 0),
+          direction,
+          0.11
+        )
+        task.wait(0.04)
+      end
+    end)
+  end
 
-	local parts = {}
-	for index = 1, GROUND_STALK_SEGMENTS do
-		local part = Instance.new("Part")
-		part.Name = "VineStem"
-		part.Shape = Enum.PartType.Cylinder
-		part.Material = Enum.Material.CorrodedMetal
-		part.Color = getRandomColor()
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 1
-		part.Size = Vector3.new(0.05, 0.28, 0.28)
-		part.Parent = model
-		table.insert(parts, part)
-	end
+  local parts = {}
+  for index = 1, GROUND_STALK_SEGMENTS do
+    local part = Instance.new("Part")
+    part.Name = "VineStem"
+    part.Shape = Enum.PartType.Cylinder
+    part.Material = Enum.Material.CorrodedMetal
+    part.Color = getRandomColor()
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Transparency = 1
+    part.Size = Vector3.new(0.05, 0.28, 0.28)
+    part.Parent = model
+    table.insert(parts, part)
+  end
 
-	generatedCount += GROUND_STALK_SEGMENTS
-	anchor.used = true
+  generatedCount += GROUND_STALK_SEGMENTS
+  anchor.used = true
 
-	table.insert(groundStalks, {
-		anchor = stalkPosition,
-		origin = anchor.position,
-		anchorData = anchor,
-		model = model,
-		parts = parts,
-		crawlerParts = crawlerParts,
-		age = -1.8,
-		direction = direction,
-		lastTargetDirection = direction,
-		awayTime = 0,
-		nextDespawnCheck = os.clock() + rng:NextNumber(8, 15)
-	})
+  table.insert(groundStalks, {
+    anchor = stalkPosition,
+    origin = anchor.position,
+    anchorData = anchor,
+    model = model,
+    parts = parts,
+    crawlerParts = crawlerParts,
+    age = -1.8,
+    direction = direction,
+    lastTargetDirection = direction,
+    awayTime = 0,
+    nextDespawnCheck = os.clock() + rng:NextNumber(8, 15)
+  })
 
-	return true
+  return true
 end
 
 local function updateGroundStalk(stalk, deltaTime)
-	if not stalk.model.Parent then return end
+  if not stalk.model.Parent then return end
 
-	stalk.age += deltaTime
+  stalk.age += deltaTime
 
-	local targetRoot, distance = findNearestPlayer(
-		stalk.anchor,
-		GROUND_STALK_TRIGGER_DISTANCE + 8
-	)
+  local targetRoot, distance = findNearestPlayer(
+    stalk.anchor,
+    GROUND_STALK_TRIGGER_DISTANCE + 8
+  )
 
-	local targetDirection = stalk.lastTargetDirection
-	local leanAmount = 0.15
+  local targetDirection = stalk.lastTargetDirection
+  local leanAmount = 0.15
 
-	if targetRoot then
-		local offset = targetRoot.Position - stalk.anchor
-		local horizontal = Vector3.new(offset.X, 0, offset.Z)
+  if targetRoot then
+    local offset = targetRoot.Position - stalk.anchor
+    local horizontal = Vector3.new(offset.X, 0, offset.Z)
 
-		if horizontal.Magnitude > 0.05 then
-			targetDirection = horizontal.Unit
-			stalk.lastTargetDirection = targetDirection
+    if horizontal.Magnitude > 0.05 then
+      targetDirection = horizontal.Unit
+      stalk.lastTargetDirection = targetDirection
 
-			local proximity = 1 - math.clamp(
-				distance / (GROUND_STALK_TRIGGER_DISTANCE + 8),
-				0,
-				1
-			)
+      local proximity = 1 - math.clamp(
+        distance / (GROUND_STALK_TRIGGER_DISTANCE + 8),
+        0,
+        1
+      )
 
-			leanAmount = 0.35 + GROUND_STALK_MAX_LEAN * proximity
-		end
-	end
+      leanAmount = 0.35 + GROUND_STALK_MAX_LEAN * proximity
+    end
+  end
 
-	stalk.direction = stalk.direction:Lerp(
-		targetDirection,
-		math.clamp(deltaTime * 3.5, 0, 1)
-	)
+  stalk.direction = stalk.direction:Lerp(
+    targetDirection,
+    math.clamp(deltaTime * 3.5, 0, 1)
+  )
 
-	if stalk.direction.Magnitude > 0.05 then
-		stalk.direction = stalk.direction.Unit
-	end
+  if stalk.direction.Magnitude > 0.05 then
+    stalk.direction = stalk.direction.Unit
+  end
 
-	local growDuration = GROWTH_DELAY * GROUND_STALK_SEGMENTS
-	local growthAlpha = math.clamp(stalk.age / growDuration, 0, 1)
-	local visibleHeight = GROUND_STALK_HEIGHT * growthAlpha
-	local visibleLean = leanAmount * growthAlpha
+  local growDuration = GROWTH_DELAY * GROUND_STALK_SEGMENTS
+  local growthAlpha = math.clamp(stalk.age / growDuration, 0, 1)
+  local visibleHeight = GROUND_STALK_HEIGHT * growthAlpha
+  local visibleLean = leanAmount * growthAlpha
 
-	for index, part in ipairs(stalk.parts) do
-		local t0 = (index - 1) / GROUND_STALK_SEGMENTS
-		local t1 = math.min(index / GROUND_STALK_SEGMENTS, growthAlpha)
+  for index, part in ipairs(stalk.parts) do
+    local t0 = (index - 1) / GROUND_STALK_SEGMENTS
+    local t1 = math.min(index / GROUND_STALK_SEGMENTS, growthAlpha)
 
-		if t1 <= t0 then
-			part.Transparency = 1
-		else
-			local function pathPoint(t)
-				local bend = t * t
+    if t1 <= t0 then
+      part.Transparency = 1
+    else
+      local function pathPoint(t)
+        local bend = t * t
 
-				return stalk.anchor + Vector3.new(
-					stalk.direction.X * visibleLean * bend,
-					visibleHeight * t,
-					stalk.direction.Z * visibleLean * bend
-				)
-			end
+        return stalk.anchor + Vector3.new(
+          stalk.direction.X * visibleLean * bend,
+          visibleHeight * t,
+          stalk.direction.Z * visibleLean * bend
+        )
+      end
 
-			local radius = 0.20
-			- (index / GROUND_STALK_SEGMENTS) * 0.035
+      local radius = 0.20
+      - (index / GROUND_STALK_SEGMENTS) * 0.035
 
-			setRoundedStalkSegment(
-				part,
-				pathPoint(t0),
-				pathPoint(t1),
-				stalk.direction,
-				radius
-			)
-		end
-	end
+      setRoundedStalkSegment(
+        part,
+        pathPoint(t0),
+        pathPoint(t1),
+        stalk.direction,
+        radius
+      )
+    end
+  end
 end
 
 local attemptPlayerGrab
 
 local function runGroundStalkSystem()
-	local scanClock = 0
-	local previousTime = os.clock()
+  local scanClock = 0
+  local previousTime = os.clock()
 
-	while infectionFolder.Parent do
-		local now = os.clock()
-		local deltaTime = math.min(now - previousTime, 0.25)
-		previousTime = now
-		scanClock += deltaTime
+  while infectionFolder.Parent do
+    local now = os.clock()
+    local deltaTime = math.min(now - previousTime, 0.25)
+    previousTime = now
+    scanClock += deltaTime
 
-		for stalkIndex = #groundStalks, 1, -1 do
-			local stalk = groundStalks[stalkIndex]
-			updateGroundStalk(stalk, deltaTime)
+    for stalkIndex = #groundStalks, 1, -1 do
+      local stalk = groundStalks[stalkIndex]
+      updateGroundStalk(stalk, deltaTime)
 
-			local nearestRoot, nearestDistance = findNearestPlayer(
-				stalk.anchor,
-				GROUND_STALK_DESPAWN_DISTANCE
-			)
-			if nearestRoot then
-				stalk.awayTime = 0
-			elseif not stalk.grabbed and now >= stalk.nextDespawnCheck then
-				stalk.awayTime += deltaTime
-				if stalk.awayTime >= 4 then
-					if rng:NextNumber() < GROUND_STALK_DESPAWN_CHANCE then
-						for _, part in ipairs(stalk.model:GetDescendants()) do
-							if part:IsA("BasePart") then
-								TweenService:Create(part, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Transparency = 1}):Play()
-							end
-						end
-						task.delay(1.2, function()
-							if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
-						end)
-						generatedCount = math.max(0, generatedCount - GROUND_STALK_SEGMENTS)
-						if stalk.anchorData then stalk.anchorData.used = false end
-						table.remove(groundStalks, stalkIndex)
-						continue
-					end
-					stalk.nextDespawnCheck = now + rng:NextNumber(10, 18)
-					stalk.awayTime = 0
-				end
-			end
+      local nearestRoot, nearestDistance = findNearestPlayer(
+        stalk.anchor,
+        GROUND_STALK_DESPAWN_DISTANCE
+      )
+      if nearestRoot then
+        stalk.awayTime = 0
+      elseif not stalk.grabbed and now >= stalk.nextDespawnCheck then
+        stalk.awayTime += deltaTime
+        if stalk.awayTime >= 4 then
+          if rng:NextNumber() < GROUND_STALK_DESPAWN_CHANCE then
+            for _, part in ipairs(stalk.model:GetDescendants()) do
+              if part:IsA("BasePart") then
+                TweenService:Create(part, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Transparency = 1}):Play()
+              end
+            end
+            task.delay(1.2, function()
+              if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
+            end)
+            generatedCount = math.max(0, generatedCount - GROUND_STALK_SEGMENTS)
+            if stalk.anchorData then stalk.anchorData.used = false end
+            table.remove(groundStalks, stalkIndex)
+            continue
+          end
+          stalk.nextDespawnCheck = now + rng:NextNumber(10, 18)
+          stalk.awayTime = 0
+        end
+      end
 
-			local stalkReady =
-				stalk.age >= GROWTH_DELAY * GROUND_STALK_SEGMENTS
+      local stalkReady =
+        stalk.age >= GROWTH_DELAY * GROUND_STALK_SEGMENTS
 
-			if stalkReady and not stalk.grabbed and activeGrabCount < 2 then
-				local targetRoot = findNearestPlayer(stalk.anchor, 5.2)
+      if stalkReady and not stalk.grabbed and activeGrabCount < 2 then
+        local targetRoot = findNearestPlayer(stalk.anchor, 5.2)
 
-				if targetRoot then
-					local character = targetRoot.Parent
-					local humanoid =
-						character and character:FindFirstChildOfClass("Humanoid")
+        if targetRoot then
+          local character = targetRoot.Parent
+          local humanoid =
+            character and character:FindFirstChildOfClass("Humanoid")
 
-					local player =
-						humanoid and Players:GetPlayerFromCharacter(character)
+          local player =
+            humanoid and Players:GetPlayerFromCharacter(character)
 
-					if player and humanoid and humanoid.Health > 0
-						and not infectedPlayers[player]
-						and attemptPlayerGrab then
+          if player and humanoid and humanoid.Health > 0
+            and not infectedPlayers[player]
+            and attemptPlayerGrab then
 
-						stalk.grabbed = true
+            stalk.grabbed = true
 
-						task.spawn(function()
-							local ok, err = pcall(
-								attemptPlayerGrab,
-								{
-									position = stalk.anchor,
-									normal = Vector3.new(0, 1, 0),
-									used = false
-								},
-								player,
-								character,
-								humanoid,
-								targetRoot
-							)
+            task.spawn(function()
+              local ok, err = pcall(
+                attemptPlayerGrab,
+                {
+                  position = stalk.anchor,
+                  normal = Vector3.new(0, 1, 0),
+                  used = false
+                },
+                player,
+                character,
+                humanoid,
+                targetRoot
+              )
 
-							if not ok then
-								warn(
-									"[INFECTION] Ground stalk capture error: "
-										.. tostring(err)
-								)
-							end
+              if not ok then
+                warn(
+                  "[INFECTION] Ground stalk capture error: "
+                    .. tostring(err)
+                )
+              end
 
-							task.wait(GROUND_STALK_GRAB_COOLDOWN)
+              task.wait(GROUND_STALK_GRAB_COOLDOWN)
 
-							if stalk.model and stalk.model.Parent then
-								stalk.grabbed = false
-							end
-						end)
-					end
-				end
-			end
-		end
+              if stalk.model and stalk.model.Parent then
+                stalk.grabbed = false
+              end
+            end)
+          end
+        end
+      end
+    end
 
-		if scanClock >= GROUND_STALK_SCAN_INTERVAL then
-			scanClock = 0
+    if scanClock >= GROUND_STALK_SCAN_INTERVAL then
+      scanClock = 0
 
-			-- Player-reactive ground vines are a mature-infection feature.
-			-- Keep the seed and developing bulb phases visually quiet.
-			if growthStage >= 3
-				and now - lastGroundStalkSpawn >= GROUND_STALK_SPAWN_COOLDOWN
-				and #groundStalks < getGroundStalkLimit() then
+      -- Player-reactive ground vines are a mature-infection feature.
+      -- Keep the seed and developing bulb phases visually quiet.
+      if growthStage >= 3
+        and now - lastGroundStalkSpawn >= GROUND_STALK_SPAWN_COOLDOWN
+        and #groundStalks < getGroundStalkLimit() then
 
-				for _, anchor in ipairs(groundAnchors) do
-					if not anchor.used then
-						local root = findNearestPlayer(
-							anchor.position,
-							GROUND_STALK_TRIGGER_DISTANCE
-						)
+        for _, anchor in ipairs(groundAnchors) do
+          if not anchor.used then
+            local root = findNearestPlayer(
+              anchor.position,
+              GROUND_STALK_TRIGGER_DISTANCE
+            )
 
-						if root then
-							if createGroundStalk(anchor, root) then
-								lastGroundStalkSpawn = now
-							end
-							break
-						end
-					end
-				end
-			end
-		end
+            if root then
+              if createGroundStalk(anchor, root) then
+                lastGroundStalkSpawn = now
+              end
+              break
+            end
+          end
+        end
+      end
+    end
 
-		task.wait(0.1)
-	end
+    task.wait(0.1)
+  end
 end
 
 --------------------------------------------------
@@ -835,206 +835,206 @@ local CEILING_VINE_THICKNESS = 0.16
 local CEILING_VINE_SCAN_INTERVAL = 1.0
 
 local function makeCeilingVineSegment(parent, startPoint, endPoint, thickness)
-	local delta = endPoint - startPoint
-	local length = math.max(delta.Magnitude, 0.1)
-	local axis = delta.Unit
+  local delta = endPoint - startPoint
+  local length = math.max(delta.Magnitude, 0.1)
+  local axis = delta.Unit
 
-	local up = Vector3.new(0, 0, -1)
-	up = up - axis * up:Dot(axis)
+  local up = Vector3.new(0, 0, -1)
+  up = up - axis * up:Dot(axis)
 
-	if up.Magnitude < 0.05 then
-		up = Vector3.new(1, 0, 0) - axis * axis.X
-	end
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(1, 0, 0) - axis * axis.X
+  end
 
-	up = up.Unit
-	local side = axis:Cross(up).Unit
+  up = up.Unit
+  local side = axis:Cross(up).Unit
 
-	local part = Instance.new("Part")
-	part.Name = "PushableCeilingVineSegment"
-	part.Shape = Enum.PartType.Cylinder
-	part.Material = Enum.Material.CorrodedMetal
-	part.Color = getRandomColor()
-	part.Size = Vector3.new(length, thickness, thickness)
-	part.CFrame = CFrame.fromMatrix(
-		(startPoint + endPoint) * 0.5,
-		axis,
-		up,
-		side
-	)
-	part.Anchored = false
-	part.CanCollide = true
-	part.CanTouch = false
-	part.CanQuery = false
-	part.Massless = false
-	part.CustomPhysicalProperties =
-		PhysicalProperties.new(0.35, 0.75, 0.05, 1, 1)
-	part.Parent = parent
+  local part = Instance.new("Part")
+  part.Name = "PushableCeilingVineSegment"
+  part.Shape = Enum.PartType.Cylinder
+  part.Material = Enum.Material.CorrodedMetal
+  part.Color = getRandomColor()
+  part.Size = Vector3.new(length, thickness, thickness)
+  part.CFrame = CFrame.fromMatrix(
+    (startPoint + endPoint) * 0.5,
+    axis,
+    up,
+    side
+  )
+  part.Anchored = false
+  part.CanCollide = true
+  part.CanTouch = false
+  part.CanQuery = false
+  part.Massless = false
+  part.CustomPhysicalProperties =
+    PhysicalProperties.new(0.35, 0.75, 0.05, 1, 1)
+  part.Parent = parent
 
-	return part
+  return part
 end
 
 local function createPushableCeilingVine(anchor)
-	if #ceilingVines >= MAX_DECORATIVE_CEILING_VINES then
-		return false
-	end
+  if #ceilingVines >= MAX_DECORATIVE_CEILING_VINES then
+    return false
+  end
 
-	local floorResult = workspace:Raycast(
-		anchor.position - Vector3.new(0, 0.12, 0),
-		Vector3.new(0, -CEILING_VINE_MAX_DROP, 0),
-		rayParams
-	)
+  local floorResult = workspace:Raycast(
+    anchor.position - Vector3.new(0, 0.12, 0),
+    Vector3.new(0, -CEILING_VINE_MAX_DROP, 0),
+    rayParams
+  )
 
-	if not floorResult then return false end
+  if not floorResult then return false end
 
-	local availableDrop = math.max(1.5, floorResult.Distance - 0.12)
+  local availableDrop = math.max(1.5, floorResult.Distance - 0.12)
 
-	local segmentCount = math.clamp(
-		math.ceil(availableDrop / CEILING_VINE_SEGMENT_LENGTH),
-		2,
-		CEILING_VINE_MAX_SEGMENTS
-	)
+  local segmentCount = math.clamp(
+    math.ceil(availableDrop / CEILING_VINE_SEGMENT_LENGTH),
+    2,
+    CEILING_VINE_MAX_SEGMENTS
+  )
 
-	local segmentLength = availableDrop / segmentCount
+  local segmentLength = availableDrop / segmentCount
 
-	local model = Instance.new("Model")
-	model.Name = "DecorativePushableCeilingVine"
-	model.Parent = infectionFolder
+  local model = Instance.new("Model")
+  model.Name = "DecorativePushableCeilingVine"
+  model.Parent = infectionFolder
 
-	local anchorPart = Instance.new("Part")
-	anchorPart.Name = "CeilingVineAnchor"
-	anchorPart.Size = Vector3.new(0.18, 0.18, 0.18)
-	anchorPart.Transparency = 1
-	anchorPart.Anchored = true
-	anchorPart.CanCollide = false
-	anchorPart.CanTouch = false
-	anchorPart.CanQuery = false
-	anchorPart.CFrame = CFrame.new(anchor.position)
-	anchorPart.Parent = model
+  local anchorPart = Instance.new("Part")
+  anchorPart.Name = "CeilingVineAnchor"
+  anchorPart.Size = Vector3.new(0.18, 0.18, 0.18)
+  anchorPart.Transparency = 1
+  anchorPart.Anchored = true
+  anchorPart.CanCollide = false
+  anchorPart.CanTouch = false
+  anchorPart.CanQuery = false
+  anchorPart.CFrame = CFrame.new(anchor.position)
+  anchorPart.Parent = model
 
-	local previousAttachment = Instance.new("Attachment")
-	previousAttachment.Name = "VineRootAttachment"
-	previousAttachment.Parent = anchorPart
+  local previousAttachment = Instance.new("Attachment")
+  previousAttachment.Name = "VineRootAttachment"
+  previousAttachment.Parent = anchorPart
 
-	local nearbyRoot = findNearestPlayer(anchor.position, 30)
-	local leanDirection = Vector3.zero
+  local nearbyRoot = findNearestPlayer(anchor.position, 30)
+  local leanDirection = Vector3.zero
 
-	if nearbyRoot then
-		local offset = nearbyRoot.Position - anchor.position
-		local horizontal = Vector3.new(offset.X, 0, offset.Z)
+  if nearbyRoot then
+    local offset = nearbyRoot.Position - anchor.position
+    local horizontal = Vector3.new(offset.X, 0, offset.Z)
 
-		if horizontal.Magnitude > 0.05 then
-			leanDirection = horizontal.Unit * 0.28
-		end
-	end
+    if horizontal.Magnitude > 0.05 then
+      leanDirection = horizontal.Unit * 0.28
+    end
+  end
 
-	local segmentParts = {}
+  local segmentParts = {}
 
-	for index = 1, segmentCount do
-		local t0 = (index - 1) / segmentCount
-		local t1 = index / segmentCount
+  for index = 1, segmentCount do
+    local t0 = (index - 1) / segmentCount
+    local t1 = index / segmentCount
 
-		local startPoint = anchor.position
-			+ Vector3.new(0, -segmentLength * (index - 1), 0)
-			+ leanDirection * t0
+    local startPoint = anchor.position
+      + Vector3.new(0, -segmentLength * (index - 1), 0)
+      + leanDirection * t0
 
-		local endPoint = anchor.position
-			+ Vector3.new(0, -segmentLength * index, 0)
-			+ leanDirection * t1
+    local endPoint = anchor.position
+      + Vector3.new(0, -segmentLength * index, 0)
+      + leanDirection * t1
 
-		local part = makeCeilingVineSegment(
-			model,
-			startPoint,
-			endPoint,
-			CEILING_VINE_THICKNESS * (1 - (index - 1) * 0.10)
-		)
+    local part = makeCeilingVineSegment(
+      model,
+      startPoint,
+      endPoint,
+      CEILING_VINE_THICKNESS * (1 - (index - 1) * 0.10)
+    )
 
-		table.insert(segmentParts, part)
+    table.insert(segmentParts, part)
 
-		local topAttachment = Instance.new("Attachment")
-		topAttachment.Position = Vector3.new(-part.Size.X * 0.5, 0, 0)
-		topAttachment.Parent = part
+    local topAttachment = Instance.new("Attachment")
+    topAttachment.Position = Vector3.new(-part.Size.X * 0.5, 0, 0)
+    topAttachment.Parent = part
 
-		local bottomAttachment = Instance.new("Attachment")
-		bottomAttachment.Position = Vector3.new(part.Size.X * 0.5, 0, 0)
-		bottomAttachment.Parent = part
+    local bottomAttachment = Instance.new("Attachment")
+    bottomAttachment.Position = Vector3.new(part.Size.X * 0.5, 0, 0)
+    bottomAttachment.Parent = part
 
-		local joint = Instance.new("BallSocketConstraint")
-		joint.Attachment0 = previousAttachment
-		joint.Attachment1 = topAttachment
-		joint.LimitsEnabled = true
-		joint.UpperAngle = 28
-		joint.Parent = model
+    local joint = Instance.new("BallSocketConstraint")
+    joint.Attachment0 = previousAttachment
+    joint.Attachment1 = topAttachment
+    joint.LimitsEnabled = true
+    joint.UpperAngle = 28
+    joint.Parent = model
 
-		previousAttachment = bottomAttachment
-	end
+    previousAttachment = bottomAttachment
+  end
 
-	local bottomPart = segmentParts[#segmentParts]
+  local bottomPart = segmentParts[#segmentParts]
 
-	local swayAttachment = Instance.new("Attachment")
-	swayAttachment.Parent = bottomPart
+  local swayAttachment = Instance.new("Attachment")
+  swayAttachment.Parent = bottomPart
 
-	local swayForce = Instance.new("VectorForce")
-	swayForce.Attachment0 = swayAttachment
-	swayForce.RelativeTo = Enum.ActuatorRelativeTo.World
-	swayForce.ApplyAtCenterOfMass = true
-	swayForce.Force = Vector3.zero
-	swayForce.Parent = bottomPart
+  local swayForce = Instance.new("VectorForce")
+  swayForce.Attachment0 = swayAttachment
+  swayForce.RelativeTo = Enum.ActuatorRelativeTo.World
+  swayForce.ApplyAtCenterOfMass = true
+  swayForce.Force = Vector3.zero
+  swayForce.Parent = bottomPart
 
-	anchor.used = true
+  anchor.used = true
 
-	table.insert(ceilingVines, {
-		model = model,
-		parts = segmentParts,
-		anchor = anchor.position,
-		swayForce = swayForce,
-		bottomPart = bottomPart
-	})
+  table.insert(ceilingVines, {
+    model = model,
+    parts = segmentParts,
+    anchor = anchor.position,
+    swayForce = swayForce,
+    bottomPart = bottomPart
+  })
 
-	return true
+  return true
 end
 
 local function runCeilingVineSystem()
-	local scanClock = 0
+  local scanClock = 0
 
-	while infectionFolder.Parent do
-		scanClock += 0.2
+  while infectionFolder.Parent do
+    scanClock += 0.2
 
-		for _, vine in ipairs(ceilingVines) do
-			if vine.model and vine.model.Parent
-				and vine.bottomPart and vine.bottomPart.Parent
-				and vine.swayForce and vine.swayForce.Parent then
+    for _, vine in ipairs(ceilingVines) do
+      if vine.model and vine.model.Parent
+        and vine.bottomPart and vine.bottomPart.Parent
+        and vine.swayForce and vine.swayForce.Parent then
 
-				local targetRoot = findNearestPlayer(vine.anchor, 24)
+        local targetRoot = findNearestPlayer(vine.anchor, 24)
 
-				if targetRoot then
-					local offset = targetRoot.Position - vine.bottomPart.Position
-					local horizontal = Vector3.new(offset.X, 0, offset.Z)
+        if targetRoot then
+          local offset = targetRoot.Position - vine.bottomPart.Position
+          local horizontal = Vector3.new(offset.X, 0, offset.Z)
 
-					if horizontal.Magnitude > 0.05 then
-						vine.swayForce.Force =
-							horizontal.Unit * vine.bottomPart.AssemblyMass * 1.6
-					end
-				else
-					vine.swayForce.Force = Vector3.zero
-				end
-			end
-		end
+          if horizontal.Magnitude > 0.05 then
+            vine.swayForce.Force =
+              horizontal.Unit * vine.bottomPart.AssemblyMass * 1.6
+          end
+        else
+          vine.swayForce.Force = Vector3.zero
+        end
+      end
+    end
 
-		if scanClock >= CEILING_VINE_SCAN_INTERVAL then
-			scanClock = 0
+    if scanClock >= CEILING_VINE_SCAN_INTERVAL then
+      scanClock = 0
 
-			if #ceilingVines < MAX_DECORATIVE_CEILING_VINES then
-				for _, anchor in ipairs(ceilingAnchors) do
-					if not anchor.used then
-						createPushableCeilingVine(anchor)
-						break
-					end
-				end
-			end
-		end
+      if #ceilingVines < MAX_DECORATIVE_CEILING_VINES then
+        for _, anchor in ipairs(ceilingAnchors) do
+          if not anchor.used then
+            createPushableCeilingVine(anchor)
+            break
+          end
+        end
+      end
+    end
 
-		task.wait(0.2)
-	end
+    task.wait(0.2)
+  end
 end
 
 --------------------------------------------------
@@ -1046,73 +1046,73 @@ local BULB_PULSE_MIN_TIME = 2.2
 local BULB_PULSE_MAX_TIME = 3.4
 
 local function createSpawnerBulb(surfacePosition, surfaceNormal)
-	local bulb = Instance.new("Part")
-	bulb.Name = "InfectionSpawnerBulb"
-	bulb.Shape = Enum.PartType.Ball
-	bulb.Material = Enum.Material.CorrodedMetal
-	bulb.Color = Color3.fromRGB(112, 57, 39)
-	bulb.Anchored = true
-	bulb.CanCollide = false
-	bulb.CanTouch = false
-	bulb.CanQuery = false
-	bulb.CastShadow = true
-	bulb.Size = Vector3.new(0.15, 0.15, 0.15)
-	bulb.CFrame = CFrame.new(
-		surfacePosition + surfaceNormal.Unit * 0.12
-	)
-	bulb.Parent = infectionFolder
+  local bulb = Instance.new("Part")
+  bulb.Name = "InfectionSpawnerBulb"
+  bulb.Shape = Enum.PartType.Ball
+  bulb.Material = Enum.Material.CorrodedMetal
+  bulb.Color = Color3.fromRGB(112, 57, 39)
+  bulb.Anchored = true
+  bulb.CanCollide = false
+  bulb.CanTouch = false
+  bulb.CanQuery = false
+  bulb.CastShadow = true
+  bulb.Size = Vector3.new(0.15, 0.15, 0.15)
+  bulb.CFrame = CFrame.new(
+    surfacePosition + surfaceNormal.Unit * 0.12
+  )
+  bulb.Parent = infectionFolder
 
-	local targetSize = Vector3.new(1.25, 1.25, 1.25)
-	-- Keep the bulb resting against the surface as it grows instead of
-	-- lifting its center far away and making it look like it is floating.
-	local targetCFrame = CFrame.new(
-		surfacePosition + surfaceNormal.Unit * (targetSize.Y * 0.48)
-	)
+  local targetSize = Vector3.new(1.25, 1.25, 1.25)
+  -- Keep the bulb resting against the surface as it grows instead of
+  -- lifting its center far away and making it look like it is floating.
+  local targetCFrame = CFrame.new(
+    surfacePosition + surfaceNormal.Unit * (targetSize.Y * 0.48)
+  )
 
-	TweenService:Create(
-		spawner,
-		TweenInfo.new(
-			BULB_GROWTH_TIME,
-			Enum.EasingStyle.Sine,
-			Enum.EasingDirection.InOut
-		),
-		{Transparency = 1}
-	):Play()
+  TweenService:Create(
+    spawner,
+    TweenInfo.new(
+      BULB_GROWTH_TIME,
+      Enum.EasingStyle.Sine,
+      Enum.EasingDirection.InOut
+    ),
+    {Transparency = 1}
+  ):Play()
 
-	local growTween = TweenService:Create(
-		bulb,
-		TweenInfo.new(
-			BULB_GROWTH_TIME,
-			Enum.EasingStyle.Sine,
-			Enum.EasingDirection.Out
-		),
-		{
-			Size = targetSize,
-			CFrame = targetCFrame
-		}
-	)
+  local growTween = TweenService:Create(
+    bulb,
+    TweenInfo.new(
+      BULB_GROWTH_TIME,
+      Enum.EasingStyle.Sine,
+      Enum.EasingDirection.Out
+    ),
+    {
+      Size = targetSize,
+      CFrame = targetCFrame
+    }
+  )
 
-	growTween.Completed:Connect(function(state)
-		if state ~= Enum.PlaybackState.Completed or not bulb.Parent then
-			return
-		end
+  growTween.Completed:Connect(function(state)
+    if state ~= Enum.PlaybackState.Completed or not bulb.Parent then
+      return
+    end
 
-		TweenService:Create(
-			bulb,
-			TweenInfo.new(
-				rng:NextNumber(BULB_PULSE_MIN_TIME, BULB_PULSE_MAX_TIME),
-				Enum.EasingStyle.Sine,
-				Enum.EasingDirection.InOut,
-				-1,
-				true
-			),
-			{Size = targetSize * 1.045}
-		):Play()
-	end)
+    TweenService:Create(
+      bulb,
+      TweenInfo.new(
+        rng:NextNumber(BULB_PULSE_MIN_TIME, BULB_PULSE_MAX_TIME),
+        Enum.EasingStyle.Sine,
+        Enum.EasingDirection.InOut,
+        -1,
+        true
+      ),
+      {Size = targetSize * 1.045}
+    ):Play()
+  end)
 
-	growTween:Play()
-	print("[INFECTION] Stage 1 seed bulb is growing.")
-	return bulb
+  growTween:Play()
+  print("[INFECTION] Stage 1 seed bulb is growing.")
+  return bulb
 end
 
 --------------------------------------------------
@@ -1120,63 +1120,63 @@ end
 --------------------------------------------------
 
 local function growDangling(position, depth)
-	if generatedCount >= MAX_SEGMENTS then return end
+  if generatedCount >= MAX_SEGMENTS then return end
 
-	local steps = rng:NextInteger(HANGING_MIN_LENGTH, HANGING_MAX_LENGTH)
-	local faceNormal = getPlayerFacingDirection(position)
-	local drift = Vector3.zero
+  local steps = rng:NextInteger(HANGING_MIN_LENGTH, HANGING_MAX_LENGTH)
+  local faceNormal = getPlayerFacingDirection(position)
+  local drift = Vector3.zero
 
-	for i = 1, steps do
-		if generatedCount >= MAX_SEGMENTS then return end
+  for i = 1, steps do
+    if generatedCount >= MAX_SEGMENTS then return end
 
-		local length = rng:NextNumber(0.9, 1.7)
+    local length = rng:NextNumber(0.9, 1.7)
 
-		local candidateOffsets = {
-			Vector3.zero,
-			Vector3.new(0.35, 0, 0),
-			Vector3.new(-0.35, 0, 0),
-			Vector3.new(0, 0, 0.35),
-			Vector3.new(0, 0, -0.35),
-			Vector3.new(0.55, 0, 0.25),
-			Vector3.new(-0.55, 0, -0.25)
-		}
+    local candidateOffsets = {
+      Vector3.zero,
+      Vector3.new(0.35, 0, 0),
+      Vector3.new(-0.35, 0, 0),
+      Vector3.new(0, 0, 0.35),
+      Vector3.new(0, 0, -0.35),
+      Vector3.new(0.55, 0, 0.25),
+      Vector3.new(-0.55, 0, -0.25)
+    }
 
-		local nextPosition = nil
-		local thickness = getThickness(depth)
+    local nextPosition = nil
+    local thickness = getThickness(depth)
 
-		for _, offset in ipairs(candidateOffsets) do
-			local candidate = position
-				+ Vector3.new(0, -length, 0)
-				+ drift
-				+ offset
+    for _, offset in ipairs(candidateOffsets) do
+      local candidate = position
+        + Vector3.new(0, -length, 0)
+        + drift
+        + offset
 
-			if canPlaceSegment(position, candidate, thickness) then
-				nextPosition = candidate
-				break
-			end
-		end
+      if canPlaceSegment(position, candidate, thickness) then
+        nextPosition = candidate
+        break
+      end
+    end
 
-		if not nextPosition then return end
+    if not nextPosition then return end
 
-		generatedCount += 1
+    generatedCount += 1
 
-		local segment = createSegment(
-			position,
-			nextPosition,
-			faceNormal,
-			thickness
-		)
+    local segment = createSegment(
+      position,
+      nextPosition,
+      faceNormal,
+      thickness
+    )
 
-		if not segment then
-			generatedCount -= 1
-			return
-		end
+    if not segment then
+      generatedCount -= 1
+      return
+    end
 
-		registerSegment(position, nextPosition)
-		position = nextPosition
+    registerSegment(position, nextPosition)
+    position = nextPosition
 
-		task.wait(GROWTH_DELAY * rng:NextNumber(0.8, 1.3))
-	end
+    task.wait(GROWTH_DELAY * rng:NextNumber(0.8, 1.3))
+  end
 end
 
 --------------------------------------------------
@@ -1184,115 +1184,115 @@ end
 --------------------------------------------------
 
 local function getNextStep(position, normal, direction, stepLength)
-	local forwardOrigin = position + normal * SURFACE_OFFSET
+  local forwardOrigin = position + normal * SURFACE_OFFSET
 
-	local forwardHit = workspace:Raycast(
-		forwardOrigin,
-		direction * (stepLength + 0.35),
-		rayParams
-	)
+  local forwardHit = workspace:Raycast(
+    forwardOrigin,
+    direction * (stepLength + 0.35),
+    rayParams
+  )
 
-	if forwardHit then
-		local newNormal = forwardHit.Normal
+  if forwardHit then
+    local newNormal = forwardHit.Normal
 
-		if newNormal:Dot(normal) < 0.92 then
-			local newPosition =
-				forwardHit.Position + newNormal * SURFACE_OFFSET
+    if newNormal:Dot(normal) < 0.92 then
+      local newPosition =
+        forwardHit.Position + newNormal * SURFACE_OFFSET
 
-			local newDirection =
-				normal - newNormal * normal:Dot(newNormal)
+      local newDirection =
+        normal - newNormal * normal:Dot(newNormal)
 
-			if newDirection.Magnitude > 0.05 then
-				return newPosition, newNormal, newDirection.Unit
-			end
-		end
-	end
+      if newDirection.Magnitude > 0.05 then
+        return newPosition, newNormal, newDirection.Unit
+      end
+    end
+  end
 
-	local targetPosition = position + direction * stepLength
-	local probeOffsets = {1.0, 2.0, 3.5, 5.0}
+  local targetPosition = position + direction * stepLength
+  local probeOffsets = {1.0, 2.0, 3.5, 5.0}
 
-	for _, height in ipairs(probeOffsets) do
-		local sampleOrigin = targetPosition + normal * height
+  for _, height in ipairs(probeOffsets) do
+    local sampleOrigin = targetPosition + normal * height
 
-		local surfaceHit = workspace:Raycast(
-			sampleOrigin,
-			-normal * (height + 2.5),
-			rayParams
-		)
+    local surfaceHit = workspace:Raycast(
+      sampleOrigin,
+      -normal * (height + 2.5),
+      rayParams
+    )
 
-		if surfaceHit then
-			local newNormal = surfaceHit.Normal
-			local newPosition =
-				surfaceHit.Position + newNormal * SURFACE_OFFSET
+    if surfaceHit then
+      local newNormal = surfaceHit.Normal
+      local newPosition =
+        surfaceHit.Position + newNormal * SURFACE_OFFSET
 
-			local newDirection =
-				direction - newNormal * direction:Dot(newNormal)
+      local newDirection =
+        direction - newNormal * direction:Dot(newNormal)
 
-			if newDirection.Magnitude > 0.05 then
-				return newPosition, newNormal, newDirection.Unit
-			end
-		end
-	end
+      if newDirection.Magnitude > 0.05 then
+        return newPosition, newNormal, newDirection.Unit
+      end
+    end
+  end
 
-	return nil
+  return nil
 end
 
 local function findAlternativeStep(
-	position,
-	normal,
-	direction,
-	stepLength,
-	thickness
+  position,
+  normal,
+  direction,
+  stepLength,
+  thickness
 )
-	local angleChoices = {
-		0, 15, -15, 28, -28, 42, -42, 60,
-		-60, 85, -85, 120, -120, 160, -160, 180
-	}
+  local angleChoices = {
+    0, 15, -15, 28, -28, 42, -42, 60,
+    -60, 85, -85, 120, -120, 160, -160, 180
+  }
 
-	local startIndex = rng:NextInteger(1, #angleChoices)
+  local startIndex = rng:NextInteger(1, #angleChoices)
 
-	for attempt = 1, #angleChoices do
-		local index =
-			((startIndex + attempt - 2) % #angleChoices) + 1
+  for attempt = 1, #angleChoices do
+    local index =
+      ((startIndex + attempt - 2) % #angleChoices) + 1
 
-		local angle = math.rad(angleChoices[index])
+    local angle = math.rad(angleChoices[index])
 
-		local candidateDirection =
-			CFrame.fromAxisAngle(normal, angle)
-			:VectorToWorldSpace(direction)
+    local candidateDirection =
+      CFrame.fromAxisAngle(normal, angle)
+      :VectorToWorldSpace(direction)
 
-		candidateDirection =
-			candidateDirection
-		- normal * candidateDirection:Dot(normal)
+    candidateDirection =
+      candidateDirection
+    - normal * candidateDirection:Dot(normal)
 
-		if candidateDirection.Magnitude > 0.05 then
-			candidateDirection = candidateDirection.Unit
+    if candidateDirection.Magnitude > 0.05 then
+      candidateDirection = candidateDirection.Unit
 
-			local nextPosition, nextNormal, nextDirection = getNextStep(
-				position,
-				normal,
-				candidateDirection,
-				stepLength
-			)
+      local nextPosition, nextNormal, nextDirection = getNextStep(
+        position,
+        normal,
+        candidateDirection,
+        stepLength
+      )
 
-			if nextPosition then
-				local distance = (nextPosition - position).Magnitude
+      if nextPosition then
+        local distance = (nextPosition - position).Magnitude
 
-				if distance >= 0.1
-					and distance <= stepLength + 1.5
-					and canPlaceSegment(
-						position,
-						nextPosition,
-						thickness
-					) then
+        if distance >= 0.1
+          and distance <= stepLength + 1.5
+          and canPlaceSegment(
+            position,
+            nextPosition,
+            thickness
+          ) then
 
-					return nextPosition, nextNormal, nextDirection
-				end
-			end
-		end
-	end
+          return nextPosition, nextNormal, nextDirection
+        end
+      end
+    end
+  end
 
-	return nil
+  return nil
 end
 
 --------------------------------------------------
@@ -1302,116 +1302,116 @@ end
 local growBranch
 
 growBranch = function(position, normal, direction, steps, depth)
-	for i = 1, steps do
-		if generatedCount >= MAX_SEGMENTS or relocationStarted then return end
+  for i = 1, steps do
+    if generatedCount >= MAX_SEGMENTS or relocationStarted then return end
 
-		direction = direction - normal * direction:Dot(normal)
+    direction = direction - normal * direction:Dot(normal)
 
-		if direction.Magnitude < 0.05 then return end
-		direction = direction.Unit
+    if direction.Magnitude < 0.05 then return end
+    direction = direction.Unit
 
-		local angle = math.rad(rng:NextNumber(-28, 28))
+    local angle = math.rad(rng:NextNumber(-28, 28))
 
-		local curvedDirection =
-			CFrame.fromAxisAngle(normal, angle)
-			:VectorToWorldSpace(direction)
+    local curvedDirection =
+      CFrame.fromAxisAngle(normal, angle)
+      :VectorToWorldSpace(direction)
 
-		direction = direction:Lerp(curvedDirection, 0.62).Unit
+    direction = direction:Lerp(curvedDirection, 0.62).Unit
 
-		local settings = ({[1]={0.65,1.05,4.6,0.035,1},[2]={0.9,1.45,3.0,0.16,2},[3]={MIN_LENGTH,MAX_LENGTH,GROWTH_DELAY,BRANCH_CHANCE,MAX_BRANCH_DEPTH},[5]={MIN_LENGTH,MAX_LENGTH,1.35,0.48,6}})[growthStage]
-		if not settings then return end
+    local settings = ({[1]={0.65,1.05,4.6,0.035,1},[2]={0.9,1.45,3.0,0.16,2},[3]={MIN_LENGTH,MAX_LENGTH,GROWTH_DELAY,BRANCH_CHANCE,MAX_BRANCH_DEPTH},[5]={MIN_LENGTH,MAX_LENGTH,1.35,0.48,6}})[growthStage]
+    if not settings then return end
 
-		-- Each successful infection feeds the colony. Early stages become
-		-- noticeably more active without skipping the timed stage progression.
-		if infectionGrowthBoosts > 0 and growthStage == 1 then
-			settings = {0.8, 1.2, 2.9, 0.12, 2}
-		elseif infectionGrowthBoosts > 0 and growthStage == 2 then
-			settings = {1.0, 1.55, 2.4, 0.22, 3}
-		end
-		local stepLength = rng:NextNumber(settings[1], settings[2])
-		local thickness = getThickness(depth)
+    -- Each successful infection feeds the colony. Early stages become
+    -- noticeably more active without skipping the timed stage progression.
+    if infectionGrowthBoosts > 0 and growthStage == 1 then
+      settings = {0.8, 1.2, 2.9, 0.12, 2}
+    elseif infectionGrowthBoosts > 0 and growthStage == 2 then
+      settings = {1.0, 1.55, 2.4, 0.22, 3}
+    end
+    local stepLength = rng:NextNumber(settings[1], settings[2])
+    local thickness = getThickness(depth)
 
-		local nextPosition, nextNormal, nextDirection =
-			findAlternativeStep(
-				position,
-				normal,
-				direction,
-				stepLength,
-				thickness
-			)
+    local nextPosition, nextNormal, nextDirection =
+      findAlternativeStep(
+        position,
+        normal,
+        direction,
+        stepLength,
+        thickness
+      )
 
-		if not nextPosition then
-			local isCeilingUnderside = normal.Y < -0.45
-			local isRoofSurface = normal.Y > 0.35
-				and position.Y > spawner.Position.Y + 4
+    if not nextPosition then
+      local isCeilingUnderside = normal.Y < -0.45
+      local isRoofSurface = normal.Y > 0.35
+        and position.Y > spawner.Position.Y + 4
 
-			if (isCeilingUnderside or isRoofSurface)
-				and rng:NextNumber() < HANGING_CHANCE then
+      if (isCeilingUnderside or isRoofSurface)
+        and rng:NextNumber() < HANGING_CHANCE then
 
-				task.spawn(function()
-					growDangling(position, depth + 1)
-				end)
-			end
+        task.spawn(function()
+          growDangling(position, depth + 1)
+        end)
+      end
 
-			return
-		end
+      return
+    end
 
-		local segmentNormal = normal + nextNormal
+    local segmentNormal = normal + nextNormal
 
-		if segmentNormal.Magnitude < 0.05 then
-			segmentNormal = normal
-		else
-			segmentNormal = segmentNormal.Unit
-		end
+    if segmentNormal.Magnitude < 0.05 then
+      segmentNormal = normal
+    else
+      segmentNormal = segmentNormal.Unit
+    end
 
-		generatedCount += 1
+    generatedCount += 1
 
-		local segment = createSegment(
-			position,
-			nextPosition,
-			segmentNormal,
-			thickness
-		)
+    local segment = createSegment(
+      position,
+      nextPosition,
+      segmentNormal,
+      thickness
+    )
 
-		if not segment then
-			generatedCount -= 1
-			return
-		end
+    if not segment then
+      generatedCount -= 1
+      return
+    end
 
-		registerSegment(position, nextPosition)
-		registerGroundAnchor(nextPosition, nextNormal)
-		registerCeilingAnchor(nextPosition, nextNormal)
+    registerSegment(position, nextPosition)
+    registerGroundAnchor(nextPosition, nextNormal)
+    registerCeilingAnchor(nextPosition, nextNormal)
 
-		position = nextPosition
-		normal = nextNormal
-		direction = nextDirection
+    position = nextPosition
+    normal = nextNormal
+    direction = nextDirection
 
-		local activeSpeed = (os.clock() < growthBoostUntil) and GROWTH_BOOST_MULTIPLIER or 1
-		local branchChance = math.min(settings[4] * activeSpeed, 0.88)
+    local activeSpeed = (os.clock() < growthBoostUntil) and GROWTH_BOOST_MULTIPLIER or 1
+    local branchChance = math.min(settings[4] * activeSpeed, 0.88)
 
-		if depth < settings[5]
-			and rng:NextNumber() < branchChance
-			and generatedCount < MAX_SEGMENTS then
+    if depth < settings[5]
+      and rng:NextNumber() < branchChance
+      and generatedCount < MAX_SEGMENTS then
 
-			local branchAngle = math.rad(rng:NextNumber(40, 110))
-			local sign = rng:NextInteger(0, 1) == 0 and -1 or 1
-			local branchDirection =
-				CFrame.fromAxisAngle(normal, branchAngle * sign)
-				:VectorToWorldSpace(direction)
+      local branchAngle = math.rad(rng:NextNumber(40, 110))
+      local sign = rng:NextInteger(0, 1) == 0 and -1 or 1
+      local branchDirection =
+        CFrame.fromAxisAngle(normal, branchAngle * sign)
+        :VectorToWorldSpace(direction)
 
-			task.spawn(function()
-				growBranch(
-					position,
-					normal,
-					branchDirection,
-					rng:NextInteger(MIN_BRANCH_STEPS, MAX_BRANCH_STEPS),
-					depth + 1
-				)
-			end)
-		end
+      task.spawn(function()
+        growBranch(
+          position,
+          normal,
+          branchDirection,
+          rng:NextInteger(MIN_BRANCH_STEPS, MAX_BRANCH_STEPS),
+          depth + 1
+        )
+      end)
+    end
 
-		task.wait((settings[3] / activeSpeed) * rng:NextNumber(0.8, 1.3))
-	end
+    task.wait((settings[3] / activeSpeed) * rng:NextNumber(0.8, 1.3))
+  end
 end
 
 --------------------------------------------------
@@ -1451,54 +1451,54 @@ local COCOON_RETRACT_TIME = 1.5
 --------------------------------------------------
 
 local function setCylinderBetween(part, pointA, pointB, thickness)
-	local difference = pointB - pointA
-	local length = math.max(difference.Magnitude, 0.05)
-	local axis = difference.Unit
+  local difference = pointB - pointA
+  local length = math.max(difference.Magnitude, 0.05)
+  local axis = difference.Unit
 
-	local up = Vector3.new(0, 1, 0)
-	up = up - axis * up:Dot(axis)
+  local up = Vector3.new(0, 1, 0)
+  up = up - axis * up:Dot(axis)
 
-	if up.Magnitude < 0.05 then
-		up = Vector3.new(1, 0, 0)
-		up = up - axis * up:Dot(axis)
-	end
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(1, 0, 0)
+    up = up - axis * up:Dot(axis)
+  end
 
-	up = up.Unit
-	local side = axis:Cross(up).Unit
+  up = up.Unit
+  local side = axis:Cross(up).Unit
 
-	part.Size = Vector3.new(length, thickness, thickness)
-	part.CFrame = CFrame.fromMatrix(
-		(pointA + pointB) * 0.5,
-		axis,
-		up,
-		side
-	)
+  part.Size = Vector3.new(length, thickness, thickness)
+  part.CFrame = CFrame.fromMatrix(
+    (pointA + pointB) * 0.5,
+    axis,
+    up,
+    side
+  )
 end
 
 local function newCaptureVine(name, thickness)
-	local part = Instance.new("Part")
-	part.Name = name
-	part.Shape = Enum.PartType.Cylinder
-	part.Material = Enum.Material.CorrodedMetal
-	part.Color = Color3.fromRGB(76, 39, 30)
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.CastShadow = true
-	part.Size = Vector3.new(0.05, thickness, thickness)
-	part.Parent = infectionFolder
+  local part = Instance.new("Part")
+  part.Name = name
+  part.Shape = Enum.PartType.Cylinder
+  part.Material = Enum.Material.CorrodedMetal
+  part.Color = Color3.fromRGB(76, 39, 30)
+  part.Anchored = true
+  part.CanCollide = false
+  part.CanTouch = false
+  part.CanQuery = false
+  part.CastShadow = true
+  part.Size = Vector3.new(0.05, thickness, thickness)
+  part.Parent = infectionFolder
 
-	return part
+  return part
 end
 
 local function getBodyCenterPart(root)
-	local character = root.Parent
+  local character = root.Parent
 
-	return character:FindFirstChild("UpperTorso")
-		or character:FindFirstChild("Torso")
-		or character:FindFirstChild("LowerTorso")
-		or root
+  return character:FindFirstChild("UpperTorso")
+    or character:FindFirstChild("Torso")
+    or character:FindFirstChild("LowerTorso")
+    or root
 end
 
 --------------------------------------------------
@@ -1506,62 +1506,62 @@ end
 --------------------------------------------------
 
 local function createContactArms(anchor, root)
-	local arms = {}
-	local targetCF = root.CFrame
-	local _, bounds = root.Parent:GetBoundingBox()
+  local arms = {}
+  local targetCF = root.CFrame
+  local _, bounds = root.Parent:GetBoundingBox()
 
-	local sideOffset = math.max(bounds.X * 0.34, 0.65)
-	local torsoY = math.clamp(bounds.Y * 0.08, -0.15, 0.35)
+  local sideOffset = math.max(bounds.X * 0.34, 0.65)
+  local torsoY = math.clamp(bounds.Y * 0.08, -0.15, 0.35)
 
-	for _, sign in ipairs({-1, 1}) do
-		local arm = newCaptureVine(
-			"PlayerGrabArm",
-			GRAB_ARM_THICKNESS
-		)
+  for _, sign in ipairs({-1, 1}) do
+    local arm = newCaptureVine(
+      "PlayerGrabArm",
+      GRAB_ARM_THICKNESS
+    )
 
-		local start = anchor.position + Vector3.new(0, 0.18, 0)
+    local start = anchor.position + Vector3.new(0, 0.18, 0)
 
-		local target = targetCF:PointToWorldSpace(
-			Vector3.new(sign * sideOffset, torsoY, 0)
-		)
+    local target = targetCF:PointToWorldSpace(
+      Vector3.new(sign * sideOffset, torsoY, 0)
+    )
 
-		setCylinderBetween(
-			arm,
-			start,
-			start:Lerp(target, 0.02),
-			GRAB_ARM_THICKNESS
-		)
+    setCylinderBetween(
+      arm,
+      start,
+      start:Lerp(target, 0.02),
+      GRAB_ARM_THICKNESS
+    )
 
-		table.insert(arms, {
-			part = arm,
-			start = start,
-			sign = sign,
-			sideOffset = sideOffset,
-			torsoY = torsoY
-		})
-	end
+    table.insert(arms, {
+      part = arm,
+      start = start,
+      sign = sign,
+      sideOffset = sideOffset,
+      torsoY = torsoY
+    })
+  end
 
-	return arms
+  return arms
 end
 
 local function updateContactArms(arms, root, alpha)
-	if not root.Parent then return end
+  if not root.Parent then return end
 
-	for _, item in ipairs(arms) do
-		local target = root.CFrame:PointToWorldSpace(
-			Vector3.new(item.sign * item.sideOffset, item.torsoY, 0)
-		)
+  for _, item in ipairs(arms) do
+    local target = root.CFrame:PointToWorldSpace(
+      Vector3.new(item.sign * item.sideOffset, item.torsoY, 0)
+    )
 
-		local eased = alpha * alpha * (3 - 2 * alpha)
-		local endPoint = item.start:Lerp(target, eased)
+    local eased = alpha * alpha * (3 - 2 * alpha)
+    local endPoint = item.start:Lerp(target, eased)
 
-		setCylinderBetween(
-			item.part,
-			item.start,
-			endPoint,
-			GRAB_ARM_THICKNESS
-		)
-	end
+    setCylinderBetween(
+      item.part,
+      item.start,
+      endPoint,
+      GRAB_ARM_THICKNESS
+    )
+  end
 end
 
 --------------------------------------------------
@@ -1569,108 +1569,108 @@ end
 --------------------------------------------------
 
 local function createBodyEntanglement(root)
-	local strands = {}
-	local bodyCenter = getBodyCenterPart(root)
+  local strands = {}
+  local bodyCenter = getBodyCenterPart(root)
 
-	local contactClearance = 0.20
-	local radiusX = math.max(
-		bodyCenter.Size.X * 0.5 + 0.085 + contactClearance,
-		0.78
-	)
-	local radiusZ = math.max(
-		bodyCenter.Size.Z * 0.5 + 0.085 + contactClearance,
-		0.64
-	)
+  local contactClearance = 0.20
+  local radiusX = math.max(
+    bodyCenter.Size.X * 0.5 + 0.085 + contactClearance,
+    0.78
+  )
+  local radiusZ = math.max(
+    bodyCenter.Size.Z * 0.5 + 0.085 + contactClearance,
+    0.64
+  )
 
-	local head = root.Parent:FindFirstChild("Head")
-	local topY
+  local head = root.Parent:FindFirstChild("Head")
+  local topY
 
-	if head and head:IsA("BasePart") then
-		local headCenterY =
-			bodyCenter.CFrame:PointToObjectSpace(head.Position).Y
+  if head and head:IsA("BasePart") then
+    local headCenterY =
+      bodyCenter.CFrame:PointToObjectSpace(head.Position).Y
 
-		topY = headCenterY + head.Size.Y * 0.12 - 0.30
-	else
-		topY = bodyCenter.Size.Y * 0.48
-	end
+    topY = headCenterY + head.Size.Y * 0.12 - 0.30
+  else
+    topY = bodyCenter.Size.Y * 0.48
+  end
 
-	local bottomY = -bodyCenter.Size.Y * 0.58
-	local halfHeight = math.max((topY - bottomY) * 0.5, 0.9)
-	local centerY = (topY + bottomY) * 0.5
+  local bottomY = -bodyCenter.Size.Y * 0.58
+  local halfHeight = math.max((topY - bottomY) * 0.5, 0.9)
+  local centerY = (topY + bottomY) * 0.5
 
-	local strandCount = 4
-	local segmentCount = 34
+  local strandCount = 4
+  local segmentCount = 34
 
-	for strandIndex = 1, strandCount do
-		local parts = {}
+  for strandIndex = 1, strandCount do
+    local parts = {}
 
-		for segmentIndex = 1, segmentCount do
-			local part = newCaptureVine(
-				"WrappingEntanglementVine",
-				0.17
-			)
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+    for segmentIndex = 1, segmentCount do
+      local part = newCaptureVine(
+        "WrappingEntanglementVine",
+        0.17
+      )
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		table.insert(strands, {
-			parts = parts,
-			phase = (strandIndex - 1) * (math.pi * 2 / strandCount),
-			turns = strandIndex % 2 == 0 and -1.75 or 1.75
-		})
-	end
+    table.insert(strands, {
+      parts = parts,
+      phase = (strandIndex - 1) * (math.pi * 2 / strandCount),
+      turns = strandIndex % 2 == 0 and -1.75 or 1.75
+    })
+  end
 
-	return {
-		strands = strands,
-		radiusX = radiusX,
-		radiusZ = radiusZ,
-		halfHeight = halfHeight,
-		centerY = centerY,
-		segmentCount = segmentCount
-	}
+  return {
+    strands = strands,
+    radiusX = radiusX,
+    radiusZ = radiusZ,
+    halfHeight = halfHeight,
+    centerY = centerY,
+    segmentCount = segmentCount
+  }
 end
 
 local function updateBodyEntanglement(entanglement, root, alpha)
-	if not root.Parent then return end
+  if not root.Parent then return end
 
-	local segmentCount = entanglement.segmentCount
+  local segmentCount = entanglement.segmentCount
 
-	for _, strand in ipairs(entanglement.strands) do
-		for index, part in ipairs(strand.parts) do
-			local t0 = (index - 1) / segmentCount
-			local t1 = index / segmentCount
+  for _, strand in ipairs(entanglement.strands) do
+    for index, part in ipairs(strand.parts) do
+      local t0 = (index - 1) / segmentCount
+      local t1 = index / segmentCount
 
-			if t0 <= alpha then
-				local function pointAt(t)
-					local angle =
-						strand.phase + t * math.pi * 2 * strand.turns
+      if t0 <= alpha then
+        local function pointAt(t)
+          local angle =
+            strand.phase + t * math.pi * 2 * strand.turns
 
-					local y =
-						(t - 0.5) * 2 * entanglement.halfHeight
+          local y =
+            (t - 0.5) * 2 * entanglement.halfHeight
 
-					local localPoint = Vector3.new(
-						math.cos(angle) * entanglement.radiusX,
-						entanglement.centerY + y,
-						math.sin(angle) * entanglement.radiusZ
-					)
+          local localPoint = Vector3.new(
+            math.cos(angle) * entanglement.radiusX,
+            entanglement.centerY + y,
+            math.sin(angle) * entanglement.radiusZ
+          )
 
-					return getBodyCenterPart(root).CFrame
-						:PointToWorldSpace(localPoint)
-				end
+          return getBodyCenterPart(root).CFrame
+            :PointToWorldSpace(localPoint)
+        end
 
-				part.Transparency = 0
+        part.Transparency = 0
 
-				setCylinderBetween(
-					part,
-					pointAt(t0),
-					pointAt(math.min(t1, alpha)),
-					0.17
-				)
-			else
-				part.Transparency = 1
-			end
-		end
-	end
+        setCylinderBetween(
+          part,
+          pointAt(t0),
+          pointAt(math.min(t1, alpha)),
+          0.17
+        )
+      else
+        part.Transparency = 1
+      end
+    end
+  end
 end
 
 --------------------------------------------------
@@ -1678,21 +1678,21 @@ end
 --------------------------------------------------
 
 local function getCharacterBoundsFrame(root)
-	return root.Parent:GetBoundingBox()
+  return root.Parent:GetBoundingBox()
 end
 
 local function getCocoonFrame(root)
-	return getCharacterBoundsFrame(root)
+  return getCharacterBoundsFrame(root)
 end
 
 local function getCharacterCocoonBounds(root)
-	local _, boxSize = root.Parent:GetBoundingBox()
+  local _, boxSize = root.Parent:GetBoundingBox()
 
-	return Vector3.new(
-		boxSize.X + 0.16,
-		boxSize.Y + 0.18,
-		boxSize.Z + 0.16
-	)
+  return Vector3.new(
+    boxSize.X + 0.16,
+    boxSize.Y + 0.18,
+    boxSize.Z + 0.16
+  )
 end
 
 --------------------------------------------------
@@ -1700,178 +1700,178 @@ end
 --------------------------------------------------
 
 local function createCocoonEntanglement(root, cocoonData)
-	local cocoonSize = cocoonData and cocoonData.targetSize
-		or getCharacterCocoonBounds(root)
+  local cocoonSize = cocoonData and cocoonData.targetSize
+    or getCharacterCocoonBounds(root)
 
-	local radiusX = cocoonSize.X * 0.5 + 0.02
-	local radiusY = cocoonSize.Y * 0.5 + 0.02
-	local radiusZ = cocoonSize.Z * 0.5 + 0.02
+  local radiusX = cocoonSize.X * 0.5 + 0.02
+  local radiusY = cocoonSize.Y * 0.5 + 0.02
+  local radiusZ = cocoonSize.Z * 0.5 + 0.02
 
-	local strands = {}
-	local segmentCount = 48
-	local meridianCount = 12
+  local strands = {}
+  local segmentCount = 48
+  local meridianCount = 12
 
-	for strandIndex = 1, meridianCount do
-		local parts = {}
+  for strandIndex = 1, meridianCount do
+    local parts = {}
 
-		for segmentIndex = 1, segmentCount do
-			local part = newCaptureVine("CocoonVerticalLoop", 0.23)
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+    for segmentIndex = 1, segmentCount do
+      local part = newCaptureVine("CocoonVerticalLoop", 0.23)
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		table.insert(strands, {
-			parts = parts,
-			angle = (strandIndex - 1)
-				* (math.pi * 2 / meridianCount),
-			kind = "meridian"
-		})
-	end
+    table.insert(strands, {
+      parts = parts,
+      angle = (strandIndex - 1)
+        * (math.pi * 2 / meridianCount),
+      kind = "meridian"
+    })
+  end
 
-	local ringCount = 9
+  local ringCount = 9
 
-	for ringIndex = 1, ringCount do
-		local parts = {}
+  for ringIndex = 1, ringCount do
+    local parts = {}
 
-		for segmentIndex = 1, segmentCount do
-			local part = newCaptureVine("CocoonHorizontalRing", 0.21)
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+    for segmentIndex = 1, segmentCount do
+      local part = newCaptureVine("CocoonHorizontalRing", 0.21)
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		local verticalLevel =
-			-0.88 + ((ringIndex - 1) / (ringCount - 1)) * 1.76
+    local verticalLevel =
+      -0.88 + ((ringIndex - 1) / (ringCount - 1)) * 1.76
 
-		table.insert(strands, {
-			parts = parts,
-			level = verticalLevel,
-			kind = "latitude"
-		})
-	end
+    table.insert(strands, {
+      parts = parts,
+      level = verticalLevel,
+      kind = "latitude"
+    })
+  end
 
-	local diagonalCount = 4
+  local diagonalCount = 4
 
-	for strandIndex = 1, diagonalCount do
-		local parts = {}
+  for strandIndex = 1, diagonalCount do
+    local parts = {}
 
-		for segmentIndex = 1, segmentCount do
-			local part = newCaptureVine("CocoonDiagonalLoop", 0.19)
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+    for segmentIndex = 1, segmentCount do
+      local part = newCaptureVine("CocoonDiagonalLoop", 0.19)
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		table.insert(strands, {
-			parts = parts,
-			phase = (strandIndex - 1)
-				* (math.pi * 2 / diagonalCount),
-			direction = strandIndex % 2 == 0 and -1 or 1,
-			kind = "diagonal"
-		})
-	end
+    table.insert(strands, {
+      parts = parts,
+      phase = (strandIndex - 1)
+        * (math.pi * 2 / diagonalCount),
+      direction = strandIndex % 2 == 0 and -1 or 1,
+      kind = "diagonal"
+    })
+  end
 
-	return {
-		strands = strands,
-		radiusX = radiusX,
-		radiusY = radiusY,
-		radiusZ = radiusZ,
-		segmentCount = segmentCount
-	}
+  return {
+    strands = strands,
+    radiusX = radiusX,
+    radiusY = radiusY,
+    radiusZ = radiusZ,
+    segmentCount = segmentCount
+  }
 end
 
 local function updateCocoonEntanglement(layer, root, alpha)
-	if not layer or not root.Parent then return end
+  if not layer or not root.Parent then return end
 
-	local centerFrame = getCocoonFrame(root)
-	local count = layer.segmentCount
+  local centerFrame = getCocoonFrame(root)
+  local count = layer.segmentCount
 
-	for _, strand in ipairs(layer.strands) do
-		for index, part in ipairs(strand.parts) do
-			local t0 = (index - 1) / count
-			local t1 = index / count
+  for _, strand in ipairs(layer.strands) do
+    for index, part in ipairs(strand.parts) do
+      local t0 = (index - 1) / count
+      local t1 = index / count
 
-			if t0 <= alpha then
-				local function pointAt(t)
-					local angle = t * math.pi * 2
+      if t0 <= alpha then
+        local function pointAt(t)
+          local angle = t * math.pi * 2
 
-					if strand.kind == "meridian" then
-						local ringRadius = math.sin(angle)
+          if strand.kind == "meridian" then
+            local ringRadius = math.sin(angle)
 
-						return centerFrame:PointToWorldSpace(Vector3.new(
-							math.cos(strand.angle)
-								* ringRadius * layer.radiusX,
-							math.cos(angle) * layer.radiusY,
-							math.sin(strand.angle)
-								* ringRadius * layer.radiusZ
-							))
+            return centerFrame:PointToWorldSpace(Vector3.new(
+              math.cos(strand.angle)
+                * ringRadius * layer.radiusX,
+              math.cos(angle) * layer.radiusY,
+              math.sin(strand.angle)
+                * ringRadius * layer.radiusZ
+              ))
 
-					elseif strand.kind == "latitude" then
-						local horizontalRadius =
-							math.sqrt(
-								math.max(0, 1 - strand.level * strand.level)
-							)
+          elseif strand.kind == "latitude" then
+            local horizontalRadius =
+              math.sqrt(
+                math.max(0, 1 - strand.level * strand.level)
+              )
 
-						return centerFrame:PointToWorldSpace(Vector3.new(
-							math.cos(angle)
-								* layer.radiusX * horizontalRadius,
-							strand.level * layer.radiusY,
-							math.sin(angle)
-								* layer.radiusZ * horizontalRadius
-							))
+            return centerFrame:PointToWorldSpace(Vector3.new(
+              math.cos(angle)
+                * layer.radiusX * horizontalRadius,
+              strand.level * layer.radiusY,
+              math.sin(angle)
+                * layer.radiusZ * horizontalRadius
+              ))
 
-					else
-						local verticalLevel =
-							math.sin(angle + strand.phase)
-							* 0.62
-							* strand.direction
+          else
+            local verticalLevel =
+              math.sin(angle + strand.phase)
+              * 0.62
+              * strand.direction
 
-						local horizontalRadius =
-							math.sqrt(
-								math.max(
-									0,
-									1 - verticalLevel * verticalLevel
-								)
-							)
+            local horizontalRadius =
+              math.sqrt(
+                math.max(
+                  0,
+                  1 - verticalLevel * verticalLevel
+                )
+              )
 
-						return centerFrame:PointToWorldSpace(Vector3.new(
-							math.cos(angle)
-								* layer.radiusX * horizontalRadius,
-							verticalLevel * layer.radiusY,
-							math.sin(angle)
-								* layer.radiusZ * horizontalRadius
-							))
-					end
-				end
+            return centerFrame:PointToWorldSpace(Vector3.new(
+              math.cos(angle)
+                * layer.radiusX * horizontalRadius,
+              verticalLevel * layer.radiusY,
+              math.sin(angle)
+                * layer.radiusZ * horizontalRadius
+              ))
+          end
+        end
 
-				part.Transparency = 0
+        part.Transparency = 0
 
-				local thickness =
-					strand.kind == "meridian" and 0.23
-					or strand.kind == "latitude" and 0.21
-					or 0.19
+        local thickness =
+          strand.kind == "meridian" and 0.23
+          or strand.kind == "latitude" and 0.21
+          or 0.19
 
-				setCylinderBetween(
-					part,
-					pointAt(t0),
-					pointAt(math.min(t1, alpha)),
-					thickness
-				)
-			else
-				part.Transparency = 1
-			end
-		end
-	end
+        setCylinderBetween(
+          part,
+          pointAt(t0),
+          pointAt(math.min(t1, alpha)),
+          thickness
+        )
+      else
+        part.Transparency = 1
+      end
+    end
+  end
 end
 
 local function destroyVineLayer(layer)
-	if not layer then return end
+  if not layer then return end
 
-	for _, strand in ipairs(layer.strands) do
-		for _, part in ipairs(strand.parts) do
-			if part and part.Parent then
-				part:Destroy()
-			end
-		end
-	end
+  for _, strand in ipairs(layer.strands) do
+    for _, part in ipairs(strand.parts) do
+      if part and part.Parent then
+        part:Destroy()
+      end
+    end
+  end
 end
 
 --------------------------------------------------
@@ -1879,87 +1879,87 @@ end
 --------------------------------------------------
 
 local function createOuterVineLayer(root)
-	local cocoonSize = getCharacterCocoonBounds(root)
+  local cocoonSize = getCharacterCocoonBounds(root)
 
-	local radiusX = cocoonSize.X * 0.5 + 0.04
-	local radiusY = cocoonSize.Y * 0.5 + 0.04
-	local radiusZ = cocoonSize.Z * 0.5 + 0.04
+  local radiusX = cocoonSize.X * 0.5 + 0.04
+  local radiusY = cocoonSize.Y * 0.5 + 0.04
+  local radiusZ = cocoonSize.Z * 0.5 + 0.04
 
-	local strands = {}
-	local strandCount = 5
-	local segmentCount = 28
+  local strands = {}
+  local strandCount = 5
+  local segmentCount = 28
 
-	for strandIndex = 1, strandCount do
-		local parts = {}
+  for strandIndex = 1, strandCount do
+    local parts = {}
 
-		for segmentIndex = 1, segmentCount do
-			local part = newCaptureVine("OuterContainmentVine", 0.20)
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+    for segmentIndex = 1, segmentCount do
+      local part = newCaptureVine("OuterContainmentVine", 0.20)
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		table.insert(strands, {
-			parts = parts,
-			phase = (strandIndex - 1) * (math.pi * 2 / strandCount),
-			tilt = (strandIndex - 1) * 0.24
-		})
-	end
+    table.insert(strands, {
+      parts = parts,
+      phase = (strandIndex - 1) * (math.pi * 2 / strandCount),
+      tilt = (strandIndex - 1) * 0.24
+    })
+  end
 
-	return {
-		strands = strands,
-		radiusX = radiusX,
-		radiusY = radiusY,
-		radiusZ = radiusZ,
-		segmentCount = segmentCount
-	}
+  return {
+    strands = strands,
+    radiusX = radiusX,
+    radiusY = radiusY,
+    radiusZ = radiusZ,
+    segmentCount = segmentCount
+  }
 end
 
 local function updateOuterVineLayer(layer, root, alpha)
-	if not layer or not root.Parent then return end
+  if not layer or not root.Parent then return end
 
-	local count = layer.segmentCount
-	local centerFrame = getCocoonFrame(root)
+  local count = layer.segmentCount
+  local centerFrame = getCocoonFrame(root)
 
-	for _, strand in ipairs(layer.strands) do
-		for index, part in ipairs(strand.parts) do
-			local t0 = (index - 1) / count
-			local t1 = index / count
+  for _, strand in ipairs(layer.strands) do
+    for index, part in ipairs(strand.parts) do
+      local t0 = (index - 1) / count
+      local t1 = index / count
 
-			if t0 <= alpha then
-				local function pointAt(t)
-					local angle = strand.phase + t * math.pi * 2
-					local vertical = (t - 0.5) * 2
+      if t0 <= alpha then
+        local function pointAt(t)
+          local angle = strand.phase + t * math.pi * 2
+          local vertical = (t - 0.5) * 2
 
-					local x = math.cos(angle) * layer.radiusX
-					local z = math.sin(angle) * layer.radiusZ
-					local y = vertical * layer.radiusY
+          local x = math.cos(angle) * layer.radiusX
+          local z = math.sin(angle) * layer.radiusZ
+          local y = vertical * layer.radiusY
 
-					local rotatedX =
-						x * math.cos(strand.tilt)
-					- y * math.sin(strand.tilt)
+          local rotatedX =
+            x * math.cos(strand.tilt)
+          - y * math.sin(strand.tilt)
 
-					local rotatedY =
-						x * math.sin(strand.tilt)
-						+ y * math.cos(strand.tilt)
+          local rotatedY =
+            x * math.sin(strand.tilt)
+            + y * math.cos(strand.tilt)
 
-					return centerFrame:PointToWorldSpace(
-						Vector3.new(rotatedX, rotatedY, z)
-					)
-				end
+          return centerFrame:PointToWorldSpace(
+            Vector3.new(rotatedX, rotatedY, z)
+          )
+        end
 
-				part.Transparency = 0
+        part.Transparency = 0
 
-				setCylinderBetween(
-					part,
-					pointAt(t0),
-					pointAt(math.min(t1, alpha)),
-					0.20
-				)
-			else
-				part.Transparency = 1
-			end
-		end
-	end
+        setCylinderBetween(
+          part,
+          pointAt(t0),
+          pointAt(math.min(t1, alpha)),
+          0.20
+        )
+      else
+        part.Transparency = 1
+      end
+    end
+  end
 end
 
 --------------------------------------------------
@@ -1967,32 +1967,32 @@ end
 --------------------------------------------------
 
 local function findHoistRoof(root, cocoonData)
-	local centerFrame = getCocoonFrame(root)
-	local cocoonSize = cocoonData.targetSize
+  local centerFrame = getCocoonFrame(root)
+  local cocoonSize = cocoonData.targetSize
 
-	local origin = centerFrame.Position
-		+ Vector3.new(0, cocoonSize.Y * 0.5 + 0.5, 0)
+  local origin = centerFrame.Position
+    + Vector3.new(0, cocoonSize.Y * 0.5 + 0.5, 0)
 
-	local result = workspace:Raycast(
-		origin,
-		Vector3.new(0, ROOF_SEARCH_DISTANCE, 0),
-		rayParams
-	)
+  local result = workspace:Raycast(
+    origin,
+    Vector3.new(0, ROOF_SEARCH_DISTANCE, 0),
+    rayParams
+  )
 
-	if not result then
-		return nil
-	end
+  if not result then
+    return nil
+  end
 
-	if result.Normal.Y > ROOF_MIN_NORMAL_Y then
-		return nil
-	end
+  if result.Normal.Y > ROOF_MIN_NORMAL_Y then
+    return nil
+  end
 
-	if not result.Instance:IsA("BasePart")
-		or not result.Instance.CanCollide then
-		return nil
-	end
+  if not result.Instance:IsA("BasePart")
+    or not result.Instance.CanCollide then
+    return nil
+  end
 
-	return result
+  return result
 end
 
 --------------------------------------------------
@@ -2000,96 +2000,96 @@ end
 --------------------------------------------------
 
 local function createHoistVines(root, cocoonData, roofResult)
-	local vines = {}
-	local roofPoint = roofResult.Position
+  local vines = {}
+  local roofPoint = roofResult.Position
 
-	local attachmentOffsets = {
-		Vector3.new(-1.15, 0, -0.8),
-		Vector3.new(1.15, 0, -0.8),
-		Vector3.new(0, 0, 1.2)
-	}
+  local attachmentOffsets = {
+    Vector3.new(-1.15, 0, -0.8),
+    Vector3.new(1.15, 0, -0.8),
+    Vector3.new(0, 0, 1.2)
+  }
 
-	for vineIndex = 1, HOIST_VINE_COUNT do
-		local offset = attachmentOffsets[vineIndex]
+  for vineIndex = 1, HOIST_VINE_COUNT do
+    local offset = attachmentOffsets[vineIndex]
 
-		local roofStart = Vector3.new(
-			roofPoint.X + offset.X,
-			roofPoint.Y - 0.12,
-			roofPoint.Z + offset.Z
-		)
+    local roofStart = Vector3.new(
+      roofPoint.X + offset.X,
+      roofPoint.Y - 0.12,
+      roofPoint.Z + offset.Z
+    )
 
-		local targetLocal = Vector3.new(
-			offset.X,
-			cocoonData.targetSize.Y * 0.34,
-			offset.Z
-		)
+    local targetLocal = Vector3.new(
+      offset.X,
+      cocoonData.targetSize.Y * 0.34,
+      offset.Z
+    )
 
-		local parts = {}
+    local parts = {}
 
-		for segmentIndex = 1, HOIST_VINE_SEGMENTS do
-			local part = newCaptureVine(
-				"CeilingHoistingVine",
-				HOIST_VINE_THICKNESS
-			)
+    for segmentIndex = 1, HOIST_VINE_SEGMENTS do
+      local part = newCaptureVine(
+        "CeilingHoistingVine",
+        HOIST_VINE_THICKNESS
+      )
 
-			part.Transparency = 1
-			table.insert(parts, part)
-		end
+      part.Transparency = 1
+      table.insert(parts, part)
+    end
 
-		table.insert(vines, {
-			parts = parts,
-			roofStart = roofStart,
-			targetLocal = targetLocal
-		})
-	end
+    table.insert(vines, {
+      parts = parts,
+      roofStart = roofStart,
+      targetLocal = targetLocal
+    })
+  end
 
-	return vines
+  return vines
 end
 
 local function updateHoistVines(vines, root, alpha)
-	if not root.Parent then return end
+  if not root.Parent then return end
 
-	local centerFrame = getCocoonFrame(root)
+  local centerFrame = getCocoonFrame(root)
 
-	for _, vine in ipairs(vines) do
-		local startPoint = vine.roofStart
-		local endPoint = centerFrame:PointToWorldSpace(vine.targetLocal)
+  for _, vine in ipairs(vines) do
+    local startPoint = vine.roofStart
+    local endPoint = centerFrame:PointToWorldSpace(vine.targetLocal)
 
-		for index, part in ipairs(vine.parts) do
-			local t0 = (index - 1) / HOIST_VINE_SEGMENTS
-			local t1 = index / HOIST_VINE_SEGMENTS
+    for index, part in ipairs(vine.parts) do
+      local t0 = (index - 1) / HOIST_VINE_SEGMENTS
+      local t1 = index / HOIST_VINE_SEGMENTS
 
-			if t0 < alpha then
-				local visibleEnd = math.min(t1, alpha)
+      if t0 < alpha then
+        local visibleEnd = math.min(t1, alpha)
 
-				local pointA = startPoint:Lerp(endPoint, t0)
-				local pointB = startPoint:Lerp(endPoint, visibleEnd)
+        local pointA = startPoint:Lerp(endPoint, t0)
+        local pointB = startPoint:Lerp(endPoint, visibleEnd)
 
-				part.Transparency = 0
+        part.Transparency = 0
 
-				setCylinderBetween(
-					part,
-					pointA,
-					pointB,
-					HOIST_VINE_THICKNESS
-				)
-			else
-				part.Transparency = 1
-			end
-		end
-	end
+        setCylinderBetween(
+          part,
+          pointA,
+          pointB,
+          HOIST_VINE_THICKNESS
+        )
+      else
+        part.Transparency = 1
+      end
+    end
+  end
 end
 
 local function destroyHoistVines(vines)
-	if not vines then return end
+  if not vines then return end
 
-	for _, vine in ipairs(vines) do
-		for _, part in ipairs(vine.parts) do
-			if part and part.Parent then
-				part:Destroy()
-			end
-		end
-	end
+  for _, vine in ipairs(vines) do
+    for _, part in ipairs(vine.parts) do
+      if part and part.Parent then
+        part:Destroy()
+      end
+    end
+  end
 end
 
 --------------------------------------------------
@@ -2097,44 +2097,44 @@ end
 --------------------------------------------------
 
 local function retractCocoonLayer(layer)
-	if not layer then return end
+  if not layer then return end
 
-	local parts = {}
+  local parts = {}
 
-	for _, strand in ipairs(layer.strands) do
-		for _, part in ipairs(strand.parts) do
-			if part and part.Parent then
-				table.insert(parts, part)
-			end
-		end
-	end
+  for _, strand in ipairs(layer.strands) do
+    for _, part in ipairs(strand.parts) do
+      if part and part.Parent then
+        table.insert(parts, part)
+      end
+    end
+  end
 
-	local startTime = os.clock()
+  local startTime = os.clock()
 
-	while os.clock() - startTime < COCOON_RETRACT_TIME do
-		local alpha = math.clamp(
-			(os.clock() - startTime) / COCOON_RETRACT_TIME,
-			0,
-			1
-		)
+  while os.clock() - startTime < COCOON_RETRACT_TIME do
+    local alpha = math.clamp(
+      (os.clock() - startTime) / COCOON_RETRACT_TIME,
+      0,
+      1
+    )
 
-		local eased = alpha * alpha * (3 - 2 * alpha)
+    local eased = alpha * alpha * (3 - 2 * alpha)
 
-		for _, part in ipairs(parts) do
-			if part.Parent then
-				part.Transparency = eased
-				part.Size = Vector3.new(
-					math.max(part.Size.X * (1 - eased), 0.02),
-					math.max(0.02, 0.21 * (1 - eased)),
-					math.max(0.02, 0.21 * (1 - eased))
-				)
-			end
-		end
+    for _, part in ipairs(parts) do
+      if part.Parent then
+        part.Transparency = eased
+        part.Size = Vector3.new(
+          math.max(part.Size.X * (1 - eased), 0.02),
+          math.max(0.02, 0.21 * (1 - eased)),
+          math.max(0.02, 0.21 * (1 - eased))
+        )
+      end
+    end
 
-		task.wait(0.035)
-	end
+    task.wait(0.035)
+  end
 
-	destroyVineLayer(layer)
+  destroyVineLayer(layer)
 end
 
 --------------------------------------------------
@@ -2142,99 +2142,99 @@ end
 --------------------------------------------------
 
 local function performCeilingHoist(
-	root,
-	cocoonData,
-	roofResult,
-	finalEntanglement,
-	outerLayer
+  root,
+  cocoonData,
+  roofResult,
+  finalEntanglement,
+  outerLayer
 )
-	if not root.Parent then return false end
+  if not root.Parent then return false end
 
-	print("[INFECTION] Suitable roof found. Growing ceiling hoisting vines.")
+  print("[INFECTION] Suitable roof found. Growing ceiling hoisting vines.")
 
-	local vines = createHoistVines(root, cocoonData, roofResult)
+  local vines = createHoistVines(root, cocoonData, roofResult)
 
-	local formationStart = os.clock()
+  local formationStart = os.clock()
 
-	while os.clock() - formationStart < HOIST_VINE_FORM_TIME do
-		if not root.Parent then
-			destroyHoistVines(vines)
-			return false
-		end
+  while os.clock() - formationStart < HOIST_VINE_FORM_TIME do
+    if not root.Parent then
+      destroyHoistVines(vines)
+      return false
+    end
 
-		local alpha = math.clamp(
-			(os.clock() - formationStart) / HOIST_VINE_FORM_TIME,
-			0,
-			1
-		)
+    local alpha = math.clamp(
+      (os.clock() - formationStart) / HOIST_VINE_FORM_TIME,
+      0,
+      1
+    )
 
-		updateCocoonEntanglement(finalEntanglement, root, 1)
-		updateOuterVineLayer(outerLayer, root, 1)
-		updateHoistVines(vines, root, alpha)
+    updateCocoonEntanglement(finalEntanglement, root, 1)
+    updateOuterVineLayer(outerLayer, root, 1)
+    updateHoistVines(vines, root, alpha)
 
-		task.wait(0.035)
-	end
+    task.wait(0.035)
+  end
 
-	updateCocoonEntanglement(finalEntanglement, root, 1)
-	updateOuterVineLayer(outerLayer, root, 1)
-	updateHoistVines(vines, root, 1)
+  updateCocoonEntanglement(finalEntanglement, root, 1)
+  updateOuterVineLayer(outerLayer, root, 1)
+  updateHoistVines(vines, root, 1)
 
-	print("[INFECTION] Ceiling vines attached. Beginning cocoon hoist.")
+  print("[INFECTION] Ceiling vines attached. Beginning cocoon hoist.")
 
-	local hoistStartCFrame = root.CFrame
-	-- The root is near the cocoon's center, so leave room for the cocoon's
-	-- entire upper half plus a small visible gap beneath the ceiling.
-	local cocoonTopClearance =
-		(cocoonData.targetSize.Y * 0.5) + HOIST_DISTANCE_BELOW_ROOF
-	local availableHeight =
-		roofResult.Position.Y - root.Position.Y
-	- cocoonTopClearance
+  local hoistStartCFrame = root.CFrame
+  -- The root is near the cocoon's center, so leave room for the cocoon's
+  -- entire upper half plus a small visible gap beneath the ceiling.
+  local cocoonTopClearance =
+    (cocoonData.targetSize.Y * 0.5) + HOIST_DISTANCE_BELOW_ROOF
+  local availableHeight =
+    roofResult.Position.Y - root.Position.Y
+  - cocoonTopClearance
 
-	local liftDistance = math.max(0, availableHeight)
+  local liftDistance = math.max(0, availableHeight)
 
-	if liftDistance < 1 then
-		print("[INFECTION] Roof is too close for a safe hoist.")
-		destroyHoistVines(vines)
-		return false
-	end
+  if liftDistance < 1 then
+    print("[INFECTION] Roof is too close for a safe hoist.")
+    destroyHoistVines(vines)
+    return false
+  end
 
-	local liftStart = os.clock()
+  local liftStart = os.clock()
 
-	while os.clock() - liftStart < HOIST_DURATION do
-		if not root.Parent then
-			destroyHoistVines(vines)
-			return false
-		end
+  while os.clock() - liftStart < HOIST_DURATION do
+    if not root.Parent then
+      destroyHoistVines(vines)
+      return false
+    end
 
-		local alpha = math.clamp(
-			(os.clock() - liftStart) / HOIST_DURATION,
-			0,
-			1
-		)
+    local alpha = math.clamp(
+      (os.clock() - liftStart) / HOIST_DURATION,
+      0,
+      1
+    )
 
-		local easedAlpha = alpha * alpha * (3 - 2 * alpha)
-		local rise = liftDistance * easedAlpha
+    local easedAlpha = alpha * alpha * (3 - 2 * alpha)
+    local rise = liftDistance * easedAlpha
 
-		root.CFrame =
-			hoistStartCFrame + Vector3.new(0, rise, 0)
+    root.CFrame =
+      hoistStartCFrame + Vector3.new(0, rise, 0)
 
-		updateCocoonEntanglement(finalEntanglement, root, 1)
-		updateOuterVineLayer(outerLayer, root, 1)
-		updateHoistVines(vines, root, 1)
+    updateCocoonEntanglement(finalEntanglement, root, 1)
+    updateOuterVineLayer(outerLayer, root, 1)
+    updateHoistVines(vines, root, 1)
 
-		task.wait(0.035)
-	end
+    task.wait(0.035)
+  end
 
-	root.CFrame =
-		hoistStartCFrame + Vector3.new(0, liftDistance, 0)
+  root.CFrame =
+    hoistStartCFrame + Vector3.new(0, liftDistance, 0)
 
-	updateCocoonEntanglement(finalEntanglement, root, 1)
-	updateOuterVineLayer(outerLayer, root, 1)
-	updateHoistVines(vines, root, 1)
+  updateCocoonEntanglement(finalEntanglement, root, 1)
+  updateOuterVineLayer(outerLayer, root, 1)
+  updateHoistVines(vines, root, 1)
 
-	print("[INFECTION] Cocoon hoist complete.")
+  print("[INFECTION] Cocoon hoist complete.")
 
-	return true, vines
+  return true, vines
 end
 
 --------------------------------------------------
@@ -2242,138 +2242,138 @@ end
 --------------------------------------------------
 
 local function hideOriginalCharacter(character)
-	local savedVisuals = {}
+  local savedVisuals = {}
 
-	for _, descendant in ipairs(character:GetDescendants()) do
-		if descendant:IsA("BasePart") then
-			savedVisuals[descendant] = {
-				Transparency = descendant.Transparency,
-				CastShadow = descendant.CastShadow
-			}
-			descendant.Transparency = 1
-			descendant.CastShadow = false
+  for _, descendant in ipairs(character:GetDescendants()) do
+    if descendant:IsA("BasePart") then
+      savedVisuals[descendant] = {
+        Transparency = descendant.Transparency,
+        CastShadow = descendant.CastShadow
+      }
+      descendant.Transparency = 1
+      descendant.CastShadow = false
 
-		elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
-			savedVisuals[descendant] = {
-				Transparency = descendant.Transparency
-			}
-			descendant.Transparency = 1
+    elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+      savedVisuals[descendant] = {
+        Transparency = descendant.Transparency
+      }
+      descendant.Transparency = 1
 
-		elseif descendant:IsA("ParticleEmitter")
-			or descendant:IsA("Trail")
-			or descendant:IsA("Beam")
-			or descendant:IsA("BillboardGui")
-			or descendant:IsA("SurfaceGui") then
-			savedVisuals[descendant] = {
-				Enabled = descendant.Enabled
-			}
-			descendant.Enabled = false
-		end
-	end
+    elseif descendant:IsA("ParticleEmitter")
+      or descendant:IsA("Trail")
+      or descendant:IsA("Beam")
+      or descendant:IsA("BillboardGui")
+      or descendant:IsA("SurfaceGui") then
+      savedVisuals[descendant] = {
+        Enabled = descendant.Enabled
+      }
+      descendant.Enabled = false
+    end
+  end
 
-	return savedVisuals
+  return savedVisuals
 end
 
 local function restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
-	if savedVisuals then
-		for instance, properties in pairs(savedVisuals) do
-			if instance and instance.Parent then
-				for property, value in pairs(properties) do
-					pcall(function()
-						instance[property] = value
-					end)
-				end
-			end
-		end
-	end
+  if savedVisuals then
+    for instance, properties in pairs(savedVisuals) do
+      if instance and instance.Parent then
+        for property, value in pairs(properties) do
+          pcall(function()
+            instance[property] = value
+          end)
+        end
+      end
+    end
+  end
 
-	if humanoid and humanoid.Parent and restoreState then
-		humanoid.WalkSpeed = restoreState.WalkSpeed
-		humanoid.AutoRotate = restoreState.AutoRotate
-		humanoid.UseJumpPower = restoreState.UseJumpPower
-		humanoid.JumpPower = restoreState.JumpPower
-		humanoid.JumpHeight = restoreState.JumpHeight
-		humanoid:SetStateEnabled(
-			Enum.HumanoidStateType.Jumping,
-			restoreState.JumpingEnabled
-		)
-	end
+  if humanoid and humanoid.Parent and restoreState then
+    humanoid.WalkSpeed = restoreState.WalkSpeed
+    humanoid.AutoRotate = restoreState.AutoRotate
+    humanoid.UseJumpPower = restoreState.UseJumpPower
+    humanoid.JumpPower = restoreState.JumpPower
+    humanoid.JumpHeight = restoreState.JumpHeight
+    humanoid:SetStateEnabled(
+      Enum.HumanoidStateType.Jumping,
+      restoreState.JumpingEnabled
+    )
+  end
 
-	if root and root.Parent and restoreState then
-		root.Anchored = restoreState.RootAnchored
-	end
+  if root and root.Parent and restoreState then
+    root.Anchored = restoreState.RootAnchored
+  end
 
-	local animateScript = character and character:FindFirstChild("Animate")
-	if animateScript then
-		animateScript.Disabled = false
-	end
+  local animateScript = character and character:FindFirstChild("Animate")
+  if animateScript then
+    animateScript.Disabled = false
+  end
 end
 
 local function prepareInfectedCharacter()
-	local template = ServerStorage:FindFirstChild("InfectedCharacter")
-	if not template or not template:IsA("Model") then
-		warn("[INFECTION] Transformation cancelled: ServerStorage.InfectedCharacter model was not found.")
-		return nil
-	end
+  local template = ServerStorage:FindFirstChild("InfectedCharacter")
+  if not template or not template:IsA("Model") then
+    warn("[INFECTION] Transformation cancelled: ServerStorage.InfectedCharacter model was not found.")
+    return nil
+  end
 
-	local clone = template:Clone()
-	local infectedHumanoid = clone:FindFirstChildOfClass("Humanoid")
-	local infectedRoot = clone:FindFirstChild("HumanoidRootPart")
+  local clone = template:Clone()
+  local infectedHumanoid = clone:FindFirstChildOfClass("Humanoid")
+  local infectedRoot = clone:FindFirstChild("HumanoidRootPart")
 
-	if not infectedHumanoid or not infectedRoot or not infectedRoot:IsA("BasePart") then
-		warn("[INFECTION] Transformation cancelled: InfectedCharacter needs a Humanoid and a BasePart named HumanoidRootPart.")
-		clone:Destroy()
-		return nil
-	end
+  if not infectedHumanoid or not infectedRoot or not infectedRoot:IsA("BasePart") then
+    warn("[INFECTION] Transformation cancelled: InfectedCharacter needs a Humanoid and a BasePart named HumanoidRootPart.")
+    clone:Destroy()
+    return nil
+  end
 
-	clone.PrimaryPart = infectedRoot
-	return clone
+  clone.PrimaryPart = infectedRoot
+  return clone
 end
 
 local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, targetCFrame, keepAnchored)
-	if not player or not player.Parent then
-		return false
-	end
+  if not player or not player.Parent then
+    return false
+  end
 
-	local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
-	local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
+  local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
+  local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
 
-	if not infectedRoot or not infectedHumanoid then
-		return false
-	end
+  if not infectedRoot or not infectedHumanoid then
+    return false
+  end
 
-	infectedCharacter.Name = player.Name
-	infectedCharacter:PivotTo(targetCFrame)
-	infectedCharacter.Parent = workspace
+  infectedCharacter.Name = player.Name
+  infectedCharacter:PivotTo(targetCFrame)
+  infectedCharacter.Parent = workspace
 
-	-- Keep the replacement physically fixed inside the cocoon until its release.
-	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored = keepAnchored == true
-		end
-	end
+  -- Keep the replacement physically fixed inside the cocoon until its release.
+  for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
+    if descendant:IsA("BasePart") then
+      descendant.Anchored = keepAnchored == true
+    end
+  end
 
-	local assigned, assignmentError = pcall(function()
-		player.Character = infectedCharacter
-	end)
+  local assigned, assignmentError = pcall(function()
+    player.Character = infectedCharacter
+  end)
 
-	if not assigned or player.Character ~= infectedCharacter then
-		warn("[INFECTION] Character assignment failed: " .. tostring(assignmentError))
-		infectedCharacter:Destroy()
-		return false
-	end
+  if not assigned or player.Character ~= infectedCharacter then
+    warn("[INFECTION] Character assignment failed: " .. tostring(assignmentError))
+    infectedCharacter:Destroy()
+    return false
+  end
 
-	if not keepAnchored then
-		pcall(function()
-			infectedRoot:SetNetworkOwner(player)
-		end)
-	end
+  if not keepAnchored then
+    pcall(function()
+      infectedRoot:SetNetworkOwner(player)
+    end)
+  end
 
-	if oldCharacter and oldCharacter.Parent then
-		oldCharacter:Destroy()
-	end
+  if oldCharacter and oldCharacter.Parent then
+    oldCharacter:Destroy()
+  end
 
-	return true
+  return true
 end
 
 --------------------------------------------------
@@ -2381,19 +2381,19 @@ end
 --------------------------------------------------
 
 local function createInvisiblePlaceholder(root)
-	local placeholder = Instance.new("Part")
-	placeholder.Name = "InvisibleInfectedPlaceholder"
-	placeholder.Size = Vector3.new(2, 4, 2)
-	placeholder.Transparency = 1
-	placeholder.Anchored = true
-	placeholder.CanCollide = false
-	placeholder.CanTouch = false
-	placeholder.CanQuery = false
-	placeholder.CastShadow = false
-	placeholder.CFrame = root.CFrame
-	placeholder.Parent = infectionFolder
+  local placeholder = Instance.new("Part")
+  placeholder.Name = "InvisibleInfectedPlaceholder"
+  placeholder.Size = Vector3.new(2, 4, 2)
+  placeholder.Transparency = 1
+  placeholder.Anchored = true
+  placeholder.CanCollide = false
+  placeholder.CanTouch = false
+  placeholder.CanQuery = false
+  placeholder.CastShadow = false
+  placeholder.CFrame = root.CFrame
+  placeholder.Parent = infectionFolder
 
-	return placeholder
+  return placeholder
 end
 
 --------------------------------------------------
@@ -2401,76 +2401,76 @@ end
 --------------------------------------------------
 
 local function createDescentVines()
-	local vines = {}
+  local vines = {}
 
-	-- These points attach around the upper body of the visible infected rig.
-	local offsets = {
-		Vector3.new(-1.1, 1.25, -0.8),
-		Vector3.new(1.1, 1.25, -0.8),
-		Vector3.new(0, 1.15, 1.2)
-	}
+  -- These points attach around the upper body of the visible infected rig.
+  local offsets = {
+    Vector3.new(-1.1, 1.25, -0.8),
+    Vector3.new(1.1, 1.25, -0.8),
+    Vector3.new(0, 1.15, 1.2)
+  }
 
-	for vineIndex = 1, DESCENT_VINE_COUNT do
-		local parts = {}
+  for vineIndex = 1, DESCENT_VINE_COUNT do
+    local parts = {}
 
-		for segmentIndex = 1, DESCENT_VINE_SEGMENTS do
-			local part = newCaptureVine(
-				"InfectedDescentVine",
-				DESCENT_VINE_THICKNESS
-			)
+    for segmentIndex = 1, DESCENT_VINE_SEGMENTS do
+      local part = newCaptureVine(
+        "InfectedDescentVine",
+        DESCENT_VINE_THICKNESS
+      )
 
-			part.Transparency = 0
-			table.insert(parts, part)
-		end
+      part.Transparency = 0
+      table.insert(parts, part)
+    end
 
-		table.insert(vines, {
-			parts = parts,
-			offset = offsets[vineIndex]
-		})
-	end
+    table.insert(vines, {
+      parts = parts,
+      offset = offsets[vineIndex]
+    })
+  end
 
-	return vines
+  return vines
 end
 
 local function updateDescentVines(vines, infectedRoot, anchorPosition)
-	if not infectedRoot or not infectedRoot.Parent then return end
+  if not infectedRoot or not infectedRoot.Parent then return end
 
-	for _, vine in ipairs(vines) do
-		-- Start at the ceiling and finish directly on the moving parasite.
-		local startPoint = anchorPosition + Vector3.new(
-			vine.offset.X,
-			-0.12,
-			vine.offset.Z
-		)
-		local endPoint = infectedRoot.CFrame:PointToWorldSpace(vine.offset)
+  for _, vine in ipairs(vines) do
+    -- Start at the ceiling and finish directly on the moving parasite.
+    local startPoint = anchorPosition + Vector3.new(
+      vine.offset.X,
+      -0.12,
+      vine.offset.Z
+    )
+    local endPoint = infectedRoot.CFrame:PointToWorldSpace(vine.offset)
 
-		for index, part in ipairs(vine.parts) do
-			local t0 = (index - 1) / DESCENT_VINE_SEGMENTS
-			local t1 = index / DESCENT_VINE_SEGMENTS
-			local pointA = startPoint:Lerp(endPoint, t0)
-			local pointB = startPoint:Lerp(endPoint, t1)
+    for index, part in ipairs(vine.parts) do
+      local t0 = (index - 1) / DESCENT_VINE_SEGMENTS
+      local t1 = index / DESCENT_VINE_SEGMENTS
+      local pointA = startPoint:Lerp(endPoint, t0)
+      local pointB = startPoint:Lerp(endPoint, t1)
 
-			part.Transparency = 0
-			setCylinderBetween(
-				part,
-				pointA,
-				pointB,
-				DESCENT_VINE_THICKNESS
-			)
-		end
-	end
+      part.Transparency = 0
+      setCylinderBetween(
+        part,
+        pointA,
+        pointB,
+        DESCENT_VINE_THICKNESS
+      )
+    end
+  end
 end
 
 local function destroyDescentVines(vines)
-	if not vines then return end
+  if not vines then return end
 
-	for _, vine in ipairs(vines) do
-		for _, part in ipairs(vine.parts) do
-			if part and part.Parent then
-				part:Destroy()
-			end
-		end
-	end
+  for _, vine in ipairs(vines) do
+    for _, part in ipairs(vine.parts) do
+      if part and part.Parent then
+        part:Destroy()
+      end
+    end
+  end
 end
 
 --------------------------------------------------
@@ -2478,168 +2478,168 @@ end
 --------------------------------------------------
 
 local function performInfectedDescent(
-	player,
-	character,
-	root,
-	humanoid,
-	finalEntanglement,
-	outerLayer,
-	hoistVines,
-	roofResult,
-	restoreState
+  player,
+  character,
+  root,
+  humanoid,
+  finalEntanglement,
+  outerLayer,
+  hoistVines,
+  roofResult,
+  restoreState
 )
-	print("[INFECTION] Cocoon holding captured player.")
+  print("[INFECTION] Cocoon holding captured player.")
 
-	-- Prepare the replacement before changing anything about the original avatar.
-	local infectedCharacter = prepareInfectedCharacter()
-	if not infectedCharacter then
-		restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
-		return false
-	end
+  -- Prepare the replacement before changing anything about the original avatar.
+  local infectedCharacter = prepareInfectedCharacter()
+  if not infectedCharacter then
+    restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
+    return false
+  end
 
-	local savedVisuals = hideOriginalCharacter(character)
-	root.Anchored = true
-	root.AssemblyLinearVelocity = Vector3.zero
-	root.AssemblyAngularVelocity = Vector3.zero
+  local savedVisuals = hideOriginalCharacter(character)
+  root.Anchored = true
+  root.AssemblyLinearVelocity = Vector3.zero
+  root.AssemblyAngularVelocity = Vector3.zero
 
-	humanoid.WalkSpeed = 0
-	humanoid.JumpPower = 0
-	humanoid.JumpHeight = 0
-	humanoid.AutoRotate = false
-	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+  humanoid.WalkSpeed = 0
+  humanoid.JumpPower = 0
+  humanoid.JumpHeight = 0
+  humanoid.AutoRotate = false
+  humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 
-	-- Swap characters WHILE the cocoon is still closed and suspended.
-	-- The infected rig remains anchored at the roof position during the reveal.
-	local transformed = replacePlayerCharacter(
-		player,
-		character,
-		infectedCharacter,
-		root.CFrame,
-		true
-	)
+  -- Swap characters WHILE the cocoon is still closed and suspended.
+  -- The infected rig remains anchored at the roof position during the reveal.
+  local transformed = replacePlayerCharacter(
+    player,
+    character,
+    infectedCharacter,
+    root.CFrame,
+    true
+  )
 
-	if not transformed then
-		restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
-		return false
-	end
+  if not transformed then
+    restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
+    return false
+  end
 
-	-- Ground stalks must never capture this player again after transformation.
-	infectedPlayers[player] = true
+  -- Ground stalks must never capture this player again after transformation.
+  infectedPlayers[player] = true
 
-	local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
-	local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
-	if not infectedRoot or not infectedHumanoid then
-		warn("[INFECTION] Replacement rig lost its root or Humanoid after assignment.")
-		return false
-	end
+  local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
+  local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
+  if not infectedRoot or not infectedHumanoid then
+    warn("[INFECTION] Replacement rig lost its root or Humanoid after assignment.")
+    return false
+  end
 
-	infectedHumanoid.WalkSpeed = 0
-	infectedHumanoid.JumpPower = 0
-	infectedHumanoid.JumpHeight = 0
-	infectedHumanoid.AutoRotate = false
+  infectedHumanoid.WalkSpeed = 0
+  infectedHumanoid.JumpPower = 0
+  infectedHumanoid.JumpHeight = 0
+  infectedHumanoid.AutoRotate = false
 
-	print("[INFECTION] Player transformed inside the suspended cocoon.")
+  print("[INFECTION] Player transformed inside the suspended cocoon.")
 
-	-- Keep the ceiling/grabbing vines attached while the new parasite is revealed.
-	local hangStart = os.clock()
-	while os.clock() - hangStart < POST_HOIST_HANG_TIME do
-		if not infectedCharacter.Parent or not infectedRoot.Parent then
-			return false
-		end
+  -- Keep the ceiling/grabbing vines attached while the new parasite is revealed.
+  local hangStart = os.clock()
+  while os.clock() - hangStart < POST_HOIST_HANG_TIME do
+    if not infectedCharacter.Parent or not infectedRoot.Parent then
+      return false
+    end
 
-		updateCocoonEntanglement(finalEntanglement, infectedRoot, 1)
-		updateOuterVineLayer(outerLayer, infectedRoot, 1)
-		if hoistVines then
-			updateHoistVines(hoistVines, infectedRoot, 1)
-		end
-		task.wait(0.05)
-	end
+    updateCocoonEntanglement(finalEntanglement, infectedRoot, 1)
+    updateOuterVineLayer(outerLayer, infectedRoot, 1)
+    if hoistVines then
+      updateHoistVines(hoistVines, infectedRoot, 1)
+    end
+    task.wait(0.05)
+  end
 
-	if not infectedCharacter.Parent or not infectedRoot.Parent then
-		return false
-	end
+  if not infectedCharacter.Parent or not infectedRoot.Parent then
+    return false
+  end
 
-	print("[INFECTION] Cocoon opening around the infected character.")
+  print("[INFECTION] Cocoon opening around the infected character.")
 
-	-- Retract the cocoon while the support vines are STILL holding it at the roof.
-	retractCocoonLayer(outerLayer)
-	retractCocoonLayer(finalEntanglement)
+  -- Retract the cocoon while the support vines are STILL holding it at the roof.
+  retractCocoonLayer(outerLayer)
+  retractCocoonLayer(finalEntanglement)
 
-	-- One final update keeps the support vines aligned with the new character.
-	if hoistVines and infectedRoot.Parent then
-		updateHoistVines(hoistVines, infectedRoot, 1)
-	end
+  -- One final update keeps the support vines aligned with the new character.
+  if hoistVines and infectedRoot.Parent then
+    updateHoistVines(hoistVines, infectedRoot, 1)
+  end
 
-	-- Only release the ceiling support once the cocoon has opened.
-	destroyHoistVines(hoistVines)
-	print("[INFECTION] Ceiling vines released. Lowering the visible infected character.")
+  -- Only release the ceiling support once the cocoon has opened.
+  destroyHoistVines(hoistVines)
+  print("[INFECTION] Ceiling vines released. Lowering the visible infected character.")
 
-	-- Only perform the hanging descent when a real ceiling was found and
-	-- the cocoon was actually hoisted. Ground-mounted outdoor cocoons must
-	-- release the infected character where it was captured, not lower it
-	-- through the floor.
-	if roofResult then
-		local descentVines = createDescentVines()
-		local descentAnchor = roofResult.Position
+  -- Only perform the hanging descent when a real ceiling was found and
+  -- the cocoon was actually hoisted. Ground-mounted outdoor cocoons must
+  -- release the infected character where it was captured, not lower it
+  -- through the floor.
+  if roofResult then
+    local descentVines = createDescentVines()
+    local descentAnchor = roofResult.Position
 
-		local startPivot = infectedCharacter:GetPivot()
-		local descentStart = os.clock()
+    local startPivot = infectedCharacter:GetPivot()
+    local descentStart = os.clock()
 
-		while os.clock() - descentStart < INFECTED_DESCENT_TIME do
-			if not infectedCharacter.Parent or not infectedRoot.Parent then
-				destroyDescentVines(descentVines)
-				return false
-			end
+    while os.clock() - descentStart < INFECTED_DESCENT_TIME do
+      if not infectedCharacter.Parent or not infectedRoot.Parent then
+        destroyDescentVines(descentVines)
+        return false
+      end
 
-			local alpha = math.clamp(
-				(os.clock() - descentStart) / INFECTED_DESCENT_TIME,
-				0,
-				1
-			)
-			local easedAlpha = alpha * alpha * (3 - 2 * alpha)
-			local offset = Vector3.new(
-				0,
-				-INFECTED_DESCENT_DISTANCE * easedAlpha,
-				0
-			)
+      local alpha = math.clamp(
+        (os.clock() - descentStart) / INFECTED_DESCENT_TIME,
+        0,
+        1
+      )
+      local easedAlpha = alpha * alpha * (3 - 2 * alpha)
+      local offset = Vector3.new(
+        0,
+        -INFECTED_DESCENT_DISTANCE * easedAlpha,
+        0
+      )
 
-			infectedCharacter:PivotTo(startPivot + offset)
-			updateDescentVines(descentVines, infectedRoot, descentAnchor)
-			task.wait(0.035)
-		end
+      infectedCharacter:PivotTo(startPivot + offset)
+      updateDescentVines(descentVines, infectedRoot, descentAnchor)
+      task.wait(0.035)
+    end
 
-		infectedCharacter:PivotTo(
-			startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
-		)
-		updateDescentVines(descentVines, infectedRoot, descentAnchor)
-		destroyDescentVines(descentVines)
-	else
-		print("[INFECTION] No ceiling hoist was used. Releasing infected character at ground level.")
-	end
+    infectedCharacter:PivotTo(
+      startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
+    )
+    updateDescentVines(descentVines, infectedRoot, descentAnchor)
+    destroyDescentVines(descentVines)
+  else
+    print("[INFECTION] No ceiling hoist was used. Releasing infected character at ground level.")
+  end
 
-	-- The parasite is now released and can move normally.
-	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored = false
-		end
-	end
+  -- The parasite is now released and can move normally.
+  for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
+    if descendant:IsA("BasePart") then
+      descendant.Anchored = false
+    end
+  end
 
-	infectedHumanoid.WalkSpeed = restoreState.WalkSpeed
-	infectedHumanoid.AutoRotate = restoreState.AutoRotate
-	infectedHumanoid.UseJumpPower = restoreState.UseJumpPower
-	infectedHumanoid.JumpPower = restoreState.JumpPower
-	infectedHumanoid.JumpHeight = restoreState.JumpHeight
-	infectedHumanoid:SetStateEnabled(
-		Enum.HumanoidStateType.Jumping,
-		restoreState.JumpingEnabled
-	)
+  infectedHumanoid.WalkSpeed = restoreState.WalkSpeed
+  infectedHumanoid.AutoRotate = restoreState.AutoRotate
+  infectedHumanoid.UseJumpPower = restoreState.UseJumpPower
+  infectedHumanoid.JumpPower = restoreState.JumpPower
+  infectedHumanoid.JumpHeight = restoreState.JumpHeight
+  infectedHumanoid:SetStateEnabled(
+    Enum.HumanoidStateType.Jumping,
+    restoreState.JumpingEnabled
+  )
 
-	pcall(function()
-		infectedRoot:SetNetworkOwner(player)
-	end)
+  pcall(function()
+    infectedRoot:SetNetworkOwner(player)
+  end)
 
-	print("[INFECTION] Infected character released successfully.")
-	return true
+  print("[INFECTION] Infected character released successfully.")
+  return true
 end
 
 --------------------------------------------------
@@ -2647,351 +2647,351 @@ end
 --------------------------------------------------
 
 local function rewardSuccessfulInfection(anchor)
-	if growthStage < 1 or growthStage > 3 then return end
+  if growthStage < 1 or growthStage > 3 then return end
 
-	infectionGrowthBoosts += 1
-	print("[INFECTION] Successful infection! The colony is feeding and expanding.")
+  infectionGrowthBoosts += 1
+  print("[INFECTION] Successful infection! The colony is feeding and expanding.")
 
-	-- A small growth burst spreads outward from the capture site. The normal
-	-- stage timer still controls when the parasite evolves to its next stage.
-	local origin = anchor.position
-	local normal = anchor.normal or Vector3.new(0, 1, 0)
-	local branchCount = math.min(3 + infectionGrowthBoosts, 6)
+  -- A small growth burst spreads outward from the capture site. The normal
+  -- stage timer still controls when the parasite evolves to its next stage.
+  local origin = anchor.position
+  local normal = anchor.normal or Vector3.new(0, 1, 0)
+  local branchCount = math.min(3 + infectionGrowthBoosts, 6)
 
-	for index = 1, branchCount do
-		local angle = (index - 1) * (math.pi * 2 / branchCount)
-		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		direction = direction - normal * direction:Dot(normal)
-		if direction.Magnitude > 0.05 then
-			task.spawn(growBranch, origin, normal, direction.Unit, rng:NextInteger(9, 15), 0)
-		end
-	end
+  for index = 1, branchCount do
+    local angle = (index - 1) * (math.pi * 2 / branchCount)
+    local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+    direction = direction - normal * direction:Dot(normal)
+    if direction.Magnitude > 0.05 then
+      task.spawn(growBranch, origin, normal, direction.Unit, rng:NextInteger(9, 15), 0)
+    end
+  end
 
-	-- The central bulb also swells slightly with each successful feeding.
-	if infectionBulb and infectionBulb.Parent then
-		local stageBaseSize = ({[1]=1.25, [2]=2.2, [3]=3.8})[growthStage] or infectionBulb.Size.X
-		local addedSize = math.min(infectionGrowthBoosts * 0.18, 0.9)
-		local targetSize = stageBaseSize + addedSize
-		TweenService:Create(
-			infectionBulb,
-			TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-			{Size = Vector3.new(targetSize, targetSize, targetSize)}
-		):Play()
-	end
+  -- The central bulb also swells slightly with each successful feeding.
+  if infectionBulb and infectionBulb.Parent then
+    local stageBaseSize = ({[1]=1.25, [2]=2.2, [3]=3.8})[growthStage] or infectionBulb.Size.X
+    local addedSize = math.min(infectionGrowthBoosts * 0.18, 0.9)
+    local targetSize = stageBaseSize + addedSize
+    TweenService:Create(
+      infectionBulb,
+      TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+      {Size = Vector3.new(targetSize, targetSize, targetSize)}
+    ):Play()
+  end
 end
 
 attemptPlayerGrab = function(anchor, player, character, humanoid, root)
-	if infectedPlayers[player] then return end
-	if activeGrabCount >= MAX_ACTIVE_GRABS or anchor.used then return end
-	if not character.Parent or humanoid.Health <= 0 then return end
-
-	anchor.used = true
-	activeGrabCount += 1
-
-	local oldWalkSpeed = humanoid.WalkSpeed
-	local oldAutoRotate = humanoid.AutoRotate
-	local oldJumpPower = humanoid.JumpPower
-	local oldJumpHeight = humanoid.JumpHeight
-	local oldUseJumpPower = humanoid.UseJumpPower
-	local oldRootAnchored = root.Anchored
-
-	local wasJumpingEnabled =
-		humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping)
-
-	local capturePosition = root.Position
-	local arms = createContactArms(anchor, root)
-	local entanglement = createBodyEntanglement(root)
-
-	local jumpCount = 0
-	local escaped = false
-
-	local jumpConnection = humanoid.StateChanged:Connect(
-		function(_, newState)
-			if newState == Enum.HumanoidStateType.Jumping then
-				jumpCount += 1
-
-				if jumpCount >= JUMPS_TO_ESCAPE then
-					escaped = true
-				end
-			end
-		end
-	)
-
-	humanoid.WalkSpeed = 0
-	humanoid.AutoRotate = false
-
-	local function holdPlayer(allowJump)
-		if not root.Parent then return end
-
-		local offset = capturePosition - root.Position
-		local verticalVelocity = root.AssemblyLinearVelocity.Y
-
-		if allowJump then
-			verticalVelocity = math.min(verticalVelocity, 0)
-		else
-			verticalVelocity = 0
-		end
+  if infectedPlayers[player] then return end
+  if activeGrabCount >= MAX_ACTIVE_GRABS or anchor.used then return end
+  if not character.Parent or humanoid.Health <= 0 then return end
+
+  anchor.used = true
+  activeGrabCount += 1
+
+  local oldWalkSpeed = humanoid.WalkSpeed
+  local oldAutoRotate = humanoid.AutoRotate
+  local oldJumpPower = humanoid.JumpPower
+  local oldJumpHeight = humanoid.JumpHeight
+  local oldUseJumpPower = humanoid.UseJumpPower
+  local oldRootAnchored = root.Anchored
+
+  local wasJumpingEnabled =
+    humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping)
+
+  local capturePosition = root.Position
+  local arms = createContactArms(anchor, root)
+  local entanglement = createBodyEntanglement(root)
+
+  local jumpCount = 0
+  local escaped = false
+
+  local jumpConnection = humanoid.StateChanged:Connect(
+    function(_, newState)
+      if newState == Enum.HumanoidStateType.Jumping then
+        jumpCount += 1
+
+        if jumpCount >= JUMPS_TO_ESCAPE then
+          escaped = true
+        end
+      end
+    end
+  )
+
+  humanoid.WalkSpeed = 0
+  humanoid.AutoRotate = false
+
+  local function holdPlayer(allowJump)
+    if not root.Parent then return end
+
+    local offset = capturePosition - root.Position
+    local verticalVelocity = root.AssemblyLinearVelocity.Y
+
+    if allowJump then
+      verticalVelocity = math.min(verticalVelocity, 0)
+    else
+      verticalVelocity = 0
+    end
 
-		root.AssemblyLinearVelocity = Vector3.new(
-			math.clamp(offset.X * 10, -20, 20),
-			verticalVelocity,
-			math.clamp(offset.Z * 10, -20, 20)
-		)
+    root.AssemblyLinearVelocity = Vector3.new(
+      math.clamp(offset.X * 10, -20, 20),
+      verticalVelocity,
+      math.clamp(offset.Z * 10, -20, 20)
+    )
 
-		root.AssemblyAngularVelocity = Vector3.zero
-	end
+    root.AssemblyAngularVelocity = Vector3.zero
+  end
 
-	local startTime = os.clock()
-	local released = false
+  local startTime = os.clock()
+  local released = false
 
-	while not released
-		and os.clock() - startTime < ENTANGLE_TIME
-		and humanoid.Health > 0
-		and character.Parent do
+  while not released
+    and os.clock() - startTime < ENTANGLE_TIME
+    and humanoid.Health > 0
+    and character.Parent do
 
-		local elapsed = os.clock() - startTime
-		local reachAlpha = math.clamp(elapsed / ARM_REACH_TIME, 0, 1)
+    local elapsed = os.clock() - startTime
+    local reachAlpha = math.clamp(elapsed / ARM_REACH_TIME, 0, 1)
 
-		updateContactArms(arms, root, reachAlpha)
+    updateContactArms(arms, root, reachAlpha)
 
-		updateBodyEntanglement(
-			entanglement,
-			root,
-			math.clamp(elapsed / ENTANGLE_TIME, 0, 1)
-		)
+    updateBodyEntanglement(
+      entanglement,
+      root,
+      math.clamp(elapsed / ENTANGLE_TIME, 0, 1)
+    )
 
-		holdPlayer(true)
+    holdPlayer(true)
 
-		if escaped then
-			released = true
-		end
+    if escaped then
+      released = true
+    end
 
-		task.wait(0.035)
-	end
+    task.wait(0.035)
+  end
 
-	local outerLayer = nil
-	local finalEntanglement = nil
-	local hoistVines = nil
-	local sealed = false
-	local roofResult = nil
-
-	if not escaped and humanoid.Health > 0 and character.Parent then
-		if jumpConnection then
-			jumpConnection:Disconnect()
-			jumpConnection = nil
-		end
+  local outerLayer = nil
+  local finalEntanglement = nil
+  local hoistVines = nil
+  local sealed = false
+  local roofResult = nil
+
+  if not escaped and humanoid.Health > 0 and character.Parent then
+    if jumpConnection then
+      jumpConnection:Disconnect()
+      jumpConnection = nil
+    end
 
-		humanoid:SetStateEnabled(
-			Enum.HumanoidStateType.Jumping,
-			false
-		)
+    humanoid:SetStateEnabled(
+      Enum.HumanoidStateType.Jumping,
+      false
+    )
 
-		humanoid.JumpPower = 0
-		humanoid.JumpHeight = 0
-		humanoid.Jump = false
+    humanoid.JumpPower = 0
+    humanoid.JumpHeight = 0
+    humanoid.Jump = false
 
-		-- Freeze the player after the escape phase.
-		-- This prevents falling and unwanted movement animations.
-		root.Anchored = true
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
+    -- Freeze the player after the escape phase.
+    -- This prevents falling and unwanted movement animations.
+    root.Anchored = true
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
 
-		for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
-			track:Stop(0)
-		end
-
-		local animateScript = character:FindFirstChild("Animate")
+    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+      track:Stop(0)
+    end
+
+    local animateScript = character:FindFirstChild("Animate")
 
-		if animateScript then
-			animateScript.Disabled = true
-		end
-
-		print("[INFECTION] Player frozen. Preparing direct cocoon formation.")
-
-		local cocoonStart = os.clock()
-
-		while os.clock() - cocoonStart < COCOON_START_DELAY
-			and humanoid.Health > 0
-			and character.Parent do
-
-			holdPlayer(false)
-			task.wait(0.035)
-		end
-
-		if humanoid.Health > 0 and character.Parent then
-			local cocoonData = {
-				targetSize = getCharacterCocoonBounds(root)
-			}
-
-			finalEntanglement =
-				createCocoonEntanglement(root, cocoonData)
-
-			outerLayer = createOuterVineLayer(root)
-
-			sealed = true
-
-			print("[INFECTION] Complete closed cocoon forming.")
-
-			local layerStart = os.clock()
-
-			while os.clock() - layerStart < OUTER_LAYER_FORM_TIME
-				and humanoid.Health > 0
-				and character.Parent do
-
-				local alpha = math.clamp(
-					(os.clock() - layerStart) / OUTER_LAYER_FORM_TIME,
-					0,
-					1
-				)
-
-				updateCocoonEntanglement(
-					finalEntanglement,
-					root,
-					alpha
-				)
-
-				updateOuterVineLayer(outerLayer, root, alpha)
-
-				task.wait(0.035)
-			end
-
-			updateCocoonEntanglement(finalEntanglement, root, 1)
-			updateOuterVineLayer(outerLayer, root, 1)
-
-			-- Remove the temporary body-wrapping vines.
-			for _, strand in ipairs(entanglement.strands) do
-				for _, part in ipairs(strand.parts) do
-					if part and part.Parent then
-						part:Destroy()
-					end
-				end
-			end
-
-			table.clear(entanglement.strands)
-
-			-- Remove the original ground contact arms.
-			for _, arm in ipairs(arms) do
-				if arm.part and arm.part.Parent then
-					arm.part:Destroy()
-				end
-			end
-
-			table.clear(arms)
-
-			print("[INFECTION] Ground vines released the sealed cocoon.")
-
-			-- Search for a suitable roof.
-			roofResult = findHoistRoof(root, cocoonData)
-
-			if roofResult then
-				local hoisted, formedVines =
-					performCeilingHoist(
-						root,
-						cocoonData,
-						roofResult,
-						finalEntanglement,
-						outerLayer
-					)
-
-				if hoisted then
-					hoistVines = formedVines
-				end
-			else
-				print("[INFECTION] No suitable roof found. Cocoon remains ground-mounted.")
-			end
-
-			-- Hold, retract, hide, and lower the placeholder.
-			local restoreState = {
-				WalkSpeed = oldWalkSpeed,
-				AutoRotate = oldAutoRotate,
-				JumpPower = oldJumpPower,
-				JumpHeight = oldJumpHeight,
-				UseJumpPower = oldUseJumpPower,
-				RootAnchored = oldRootAnchored,
-				JumpingEnabled = wasJumpingEnabled
-			}
-
-			local infectionSucceeded = performInfectedDescent(
-				player,
-				character,
-				root,
-				humanoid,
-				finalEntanglement,
-				outerLayer,
-				hoistVines,
-				roofResult,
-				restoreState
-			)
-
-			if infectionSucceeded then
-				rewardSuccessfulInfection(anchor)
-			end
-		end
-	end
-
-	if jumpConnection then
-		jumpConnection:Disconnect()
-	end
-
-	-- Only restore movement if the player escaped or capture
-	-- was interrupted BEFORE the cocoon was sealed.
-	if humanoid.Parent and not sealed then
-		humanoid.WalkSpeed = oldWalkSpeed
-		humanoid.AutoRotate = oldAutoRotate
-		humanoid.UseJumpPower = oldUseJumpPower
-		humanoid.JumpPower = oldJumpPower
-		humanoid.JumpHeight = oldJumpHeight
-
-		root.Anchored = oldRootAnchored
-
-		humanoid:SetStateEnabled(
-			Enum.HumanoidStateType.Jumping,
-			wasJumpingEnabled
-		)
-
-		local animateScript = character:FindFirstChild("Animate")
-
-		if animateScript then
-			animateScript.Disabled = false
-		end
-	end
-
-	for _, arm in ipairs(arms) do
-		if arm.part and arm.part.Parent then
-			arm.part:Destroy()
-		end
-	end
-
-	for _, strand in ipairs(entanglement.strands) do
-		for _, part in ipairs(strand.parts) do
-			if part and part.Parent then
-				part:Destroy()
-			end
-		end
-	end
-
-	-- These layers may already have been destroyed during retraction.
-	if outerLayer then
-		destroyVineLayer(outerLayer)
-	end
-
-	if finalEntanglement then
-		destroyVineLayer(finalEntanglement)
-	end
-
-	if hoistVines then
-		destroyHoistVines(hoistVines)
-	end
-
-	activeGrabCount = math.max(0, activeGrabCount - 1)
-
-	if escaped then
-		print("[INFECTION] Player escaped during the entanglement phase.")
-	elseif sealed then
-		print("[INFECTION] Capture sequence complete.")
-	else
-		print("[INFECTION] Capture sequence ended or was interrupted.")
-	end
+    if animateScript then
+      animateScript.Disabled = true
+    end
+
+    print("[INFECTION] Player frozen. Preparing direct cocoon formation.")
+
+    local cocoonStart = os.clock()
+
+    while os.clock() - cocoonStart < COCOON_START_DELAY
+      and humanoid.Health > 0
+      and character.Parent do
+
+      holdPlayer(false)
+      task.wait(0.035)
+    end
+
+    if humanoid.Health > 0 and character.Parent then
+      local cocoonData = {
+        targetSize = getCharacterCocoonBounds(root)
+      }
+
+      finalEntanglement =
+        createCocoonEntanglement(root, cocoonData)
+
+      outerLayer = createOuterVineLayer(root)
+
+      sealed = true
+
+      print("[INFECTION] Complete closed cocoon forming.")
+
+      local layerStart = os.clock()
+
+      while os.clock() - layerStart < OUTER_LAYER_FORM_TIME
+        and humanoid.Health > 0
+        and character.Parent do
+
+        local alpha = math.clamp(
+          (os.clock() - layerStart) / OUTER_LAYER_FORM_TIME,
+          0,
+          1
+        )
+
+        updateCocoonEntanglement(
+          finalEntanglement,
+          root,
+          alpha
+        )
+
+        updateOuterVineLayer(outerLayer, root, alpha)
+
+        task.wait(0.035)
+      end
+
+      updateCocoonEntanglement(finalEntanglement, root, 1)
+      updateOuterVineLayer(outerLayer, root, 1)
+
+      -- Remove the temporary body-wrapping vines.
+      for _, strand in ipairs(entanglement.strands) do
+        for _, part in ipairs(strand.parts) do
+          if part and part.Parent then
+            part:Destroy()
+          end
+        end
+      end
+
+      table.clear(entanglement.strands)
+
+      -- Remove the original ground contact arms.
+      for _, arm in ipairs(arms) do
+        if arm.part and arm.part.Parent then
+          arm.part:Destroy()
+        end
+      end
+
+      table.clear(arms)
+
+      print("[INFECTION] Ground vines released the sealed cocoon.")
+
+      -- Search for a suitable roof.
+      roofResult = findHoistRoof(root, cocoonData)
+
+      if roofResult then
+        local hoisted, formedVines =
+          performCeilingHoist(
+            root,
+            cocoonData,
+            roofResult,
+            finalEntanglement,
+            outerLayer
+          )
+
+        if hoisted then
+          hoistVines = formedVines
+        end
+      else
+        print("[INFECTION] No suitable roof found. Cocoon remains ground-mounted.")
+      end
+
+      -- Hold, retract, hide, and lower the placeholder.
+      local restoreState = {
+        WalkSpeed = oldWalkSpeed,
+        AutoRotate = oldAutoRotate,
+        JumpPower = oldJumpPower,
+        JumpHeight = oldJumpHeight,
+        UseJumpPower = oldUseJumpPower,
+        RootAnchored = oldRootAnchored,
+        JumpingEnabled = wasJumpingEnabled
+      }
+
+      local infectionSucceeded = performInfectedDescent(
+        player,
+        character,
+        root,
+        humanoid,
+        finalEntanglement,
+        outerLayer,
+        hoistVines,
+        roofResult,
+        restoreState
+      )
+
+      if infectionSucceeded then
+        rewardSuccessfulInfection(anchor)
+      end
+    end
+  end
+
+  if jumpConnection then
+    jumpConnection:Disconnect()
+  end
+
+  -- Only restore movement if the player escaped or capture
+  -- was interrupted BEFORE the cocoon was sealed.
+  if humanoid.Parent and not sealed then
+    humanoid.WalkSpeed = oldWalkSpeed
+    humanoid.AutoRotate = oldAutoRotate
+    humanoid.UseJumpPower = oldUseJumpPower
+    humanoid.JumpPower = oldJumpPower
+    humanoid.JumpHeight = oldJumpHeight
+
+    root.Anchored = oldRootAnchored
+
+    humanoid:SetStateEnabled(
+      Enum.HumanoidStateType.Jumping,
+      wasJumpingEnabled
+    )
+
+    local animateScript = character:FindFirstChild("Animate")
+
+    if animateScript then
+      animateScript.Disabled = false
+    end
+  end
+
+  for _, arm in ipairs(arms) do
+    if arm.part and arm.part.Parent then
+      arm.part:Destroy()
+    end
+  end
+
+  for _, strand in ipairs(entanglement.strands) do
+    for _, part in ipairs(strand.parts) do
+      if part and part.Parent then
+        part:Destroy()
+      end
+    end
+  end
+
+  -- These layers may already have been destroyed during retraction.
+  if outerLayer then
+    destroyVineLayer(outerLayer)
+  end
+
+  if finalEntanglement then
+    destroyVineLayer(finalEntanglement)
+  end
+
+  if hoistVines then
+    destroyHoistVines(hoistVines)
+  end
+
+  activeGrabCount = math.max(0, activeGrabCount - 1)
+
+  if escaped then
+    print("[INFECTION] Player escaped during the entanglement phase.")
+  elseif sealed then
+    print("[INFECTION] Capture sequence complete.")
+  else
+    print("[INFECTION] Capture sequence ended or was interrupted.")
+  end
 end
 
 --------------------------------------------------
@@ -2999,633 +2999,633 @@ end
 --------------------------------------------------
 
 local function setBulbSize(size, duration)
-	if infectionBulb and infectionBulb.Parent then
-		TweenService:Create(infectionBulb, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = Vector3.new(size, size, size)}):Play()
-	end
+  if infectionBulb and infectionBulb.Parent then
+    TweenService:Create(infectionBulb, TweenInfo.new(duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = Vector3.new(size, size, size)}):Play()
+  end
 end
 
 local function retractStageThreeTendrils()
-	print("[INFECTION] Stage 4: retracting the old tendril network.")
-	local old = growthSegments
-	growthSegments = {}
-	for _, part in ipairs(old) do
-		if part and part.Parent then
-			local duration = rng:NextNumber(1.5, 2.8)
-			TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = Vector3.new(0.03, 0.02, 0.02), Transparency = 1}):Play()
-			task.delay(duration + 0.1, function()
-				if part and part.Parent then part:Destroy() end
-			end)
-		end
-	end
-	generatedCount = math.max(0, generatedCount - #old)
-	table.clear(occupiedPositions)
-	table.clear(groundAnchors)
-	table.clear(ceilingAnchors)
-	for _, stalk in ipairs(groundStalks) do
-		if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
-	end
-	table.clear(groundStalks)
-	for _, vine in ipairs(ceilingVines) do
-		if vine.model and vine.model.Parent then vine.model:Destroy() end
-	end
-	table.clear(ceilingVines)
+  print("[INFECTION] Stage 4: retracting the old tendril network.")
+  local old = growthSegments
+  growthSegments = {}
+  for _, part in ipairs(old) do
+    if part and part.Parent then
+      local duration = rng:NextNumber(1.5, 2.8)
+      TweenService:Create(part, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = Vector3.new(0.03, 0.02, 0.02), Transparency = 1}):Play()
+      task.delay(duration + 0.1, function()
+        if part and part.Parent then part:Destroy() end
+      end)
+    end
+  end
+  generatedCount = math.max(0, generatedCount - #old)
+  table.clear(occupiedPositions)
+  table.clear(groundAnchors)
+  table.clear(ceilingAnchors)
+  for _, stalk in ipairs(groundStalks) do
+    if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
+  end
+  table.clear(groundStalks)
+  for _, vine in ipairs(ceilingVines) do
+    if vine.model and vine.model.Parent then vine.model:Destroy() end
+  end
+  table.clear(ceilingVines)
 end
 
 local function makeWalkerLeg()
-	local function makeLimbPart(name, thickness)
-		local part = Instance.new("Part")
-		part.Name = name
-		part.Shape = Enum.PartType.Cylinder
-		part.Material = Enum.Material.CorrodedMetal
-		part.Color = Color3.fromRGB(72, 37, 29)
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanTouch = false
-		part.CanQuery = false
-		part.Transparency = 1 -- Hide at the origin until the first animation frame positions it.
-		part.Parent = infectionFolder
-		return part
-	end
+  local function makeLimbPart(name, thickness)
+    local part = Instance.new("Part")
+    part.Name = name
+    part.Shape = Enum.PartType.Cylinder
+    part.Material = Enum.Material.CorrodedMetal
+    part.Color = Color3.fromRGB(72, 37, 29)
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Transparency = 1 -- Hide at the origin until the first animation frame positions it.
+    part.Parent = infectionFolder
+    return part
+  end
 
-	-- Each leg has an upper and lower section so it bends at a visible knee.
-	return {
-		upper = makeLimbPart("Stage4LegUpper", 0.46),
-		lower = makeLimbPart("Stage4LegLower", 0.31)
-	}
+  -- Each leg has an upper and lower section so it bends at a visible knee.
+  return {
+    upper = makeLimbPart("Stage4LegUpper", 0.46),
+    lower = makeLimbPart("Stage4LegLower", 0.31)
+  }
 end
 
 local function crawlToNestTarget()
-	local target = workspace:FindFirstChild("InfectionNestTarget", true)
-	local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
+  local target = workspace:FindFirstChild("InfectionNestTarget", true)
+  local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
 
-	if not target or not target:IsA("BasePart") then
-		warn("[INFECTION] Missing BasePart named InfectionNestTarget.")
-		return false
-	end
-	if not houseZone or not houseZone:IsA("BasePart") then
-		warn("[INFECTION] Missing BasePart named InfectionHouseZone. Add an invisible zone covering the house interior.")
-		return false
-	end
+  if not target or not target:IsA("BasePart") then
+    warn("[INFECTION] Missing BasePart named InfectionNestTarget.")
+    return false
+  end
+  if not houseZone or not houseZone:IsA("BasePart") then
+    warn("[INFECTION] Missing BasePart named InfectionHouseZone. Add an invisible zone covering the house interior.")
+    return false
+  end
 
-	-- The nest marker must be inside the volume that identifies the house.
-	local markerLocal = houseZone.CFrame:PointToObjectSpace(target.Position)
-	local halfSize = houseZone.Size * 0.5
-	if math.abs(markerLocal.X) > halfSize.X
-		or math.abs(markerLocal.Y) > halfSize.Y
-		or math.abs(markerLocal.Z) > halfSize.Z then
-		warn("[INFECTION] InfectionNestTarget is outside InfectionHouseZone. Move the marker inside the zone.")
-		return false
-	end
+  -- The nest marker must be inside the volume that identifies the house.
+  local markerLocal = houseZone.CFrame:PointToObjectSpace(target.Position)
+  local halfSize = houseZone.Size * 0.5
+  if math.abs(markerLocal.X) > halfSize.X
+    or math.abs(markerLocal.Y) > halfSize.Y
+    or math.abs(markerLocal.Z) > halfSize.Z then
+    warn("[INFECTION] InfectionNestTarget is outside InfectionHouseZone. Move the marker inside the zone.")
+    return false
+  end
 
-	-- Ignore the two invisible helper parts when finding the actual floor.
-	local floorParams = RaycastParams.new()
-	floorParams.FilterType = Enum.RaycastFilterType.Exclude
-	floorParams.FilterDescendantsInstances = {spawner, infectionFolder, target, houseZone}
-	floorParams.IgnoreWater = true
+  -- Ignore the two invisible helper parts when finding the actual floor.
+  local floorParams = RaycastParams.new()
+  floorParams.FilterType = Enum.RaycastFilterType.Exclude
+  floorParams.FilterDescendantsInstances = {spawner, infectionFolder, target, houseZone}
+  floorParams.IgnoreWater = true
 
-	local function findFloor(position)
-		return workspace:Raycast(
-			position + Vector3.new(0, 8, 0),
-			Vector3.new(0, -60, 0),
-			floorParams
-		)
-	end
+  local function findFloor(position)
+    return workspace:Raycast(
+      position + Vector3.new(0, 8, 0),
+      Vector3.new(0, -60, 0),
+      floorParams
+    )
+  end
 
-	local startFloor = findFloor(infectionBulb.Position)
-	local targetFloor = findFloor(target.Position)
-	if not startFloor or not targetFloor then
-		warn("[INFECTION] Could not find the floor beneath the bulb or nest marker.")
-		return false
-	end
+  local startFloor = findFloor(infectionBulb.Position)
+  local targetFloor = findFloor(target.Position)
+  if not startFloor or not targetFloor then
+    warn("[INFECTION] Could not find the floor beneath the bulb or nest marker.")
+    return false
+  end
 
-	local path = PathfindingService:CreatePath({
-		-- Give the 4.3-stud bulb a little extra clearance through doorways.
-		AgentRadius = 2.25,
-		AgentHeight = 4,
-		AgentCanJump = true,
-		WaypointSpacing = 3
-	})
-	local pathStart = startFloor.Position + Vector3.new(0, 2, 0)
-	local pathFinish = targetFloor.Position + Vector3.new(0, 2, 0)
-	local ok = pcall(function()
-		path:ComputeAsync(pathStart, pathFinish)
-	end)
-	local routePoints = {}
-	local useWindowClimb = false
-	if ok and path.Status == Enum.PathStatus.Success then
-		for _, waypoint in ipairs(path:GetWaypoints()) do
-			local waypointFloor = findFloor(waypoint.Position)
-			local floorPosition = waypointFloor and waypointFloor.Position or waypoint.Position
-			table.insert(routePoints, {
-				position = floorPosition + Vector3.new(0, 2, 0),
-				mode = "ground"
-			})
-		end
-	else
-		-- If the navmesh cannot find a doorway route, look for a clear
-		-- horizontal band above the solid wall: this is the window opening.
-		local horizontal = Vector3.new(
-			targetFloor.Position.X - startFloor.Position.X,
-			0,
-			targetFloor.Position.Z - startFloor.Position.Z
-		)
-		if horizontal.Magnitude < 0.1 then
-			warn("[INFECTION] No floor route or usable window direction was found.")
-			return false
-		end
-		local direction = horizontal.Unit
-		local wallOrigin = startFloor.Position + Vector3.new(0, 2, 0)
-		local wallHit = workspace:Raycast(wallOrigin, direction * horizontal.Magnitude, floorParams)
-		local clearHeight = nil
-		if wallHit then
-			for height = 2.5, 8.5, 0.5 do
-				local rayOrigin = startFloor.Position + Vector3.new(0, height, 0)
-				local rayTarget = targetFloor.Position + Vector3.new(0, height, 0)
-				local obstruction = workspace:Raycast(rayOrigin, rayTarget - rayOrigin, floorParams)
-				if not obstruction then
-					clearHeight = height
-					break
-				end
-			end
-		end
-		if not wallHit or not clearHeight then
-			warn("[INFECTION] No doorway path or clear window-height opening found. Check the window is open and unobstructed.")
-			return false
-		end
+  local path = PathfindingService:CreatePath({
+    -- Give the 4.3-stud bulb a little extra clearance through doorways.
+    AgentRadius = 2.25,
+    AgentHeight = 4,
+    AgentCanJump = true,
+    WaypointSpacing = 3
+  })
+  local pathStart = startFloor.Position + Vector3.new(0, 2, 0)
+  local pathFinish = targetFloor.Position + Vector3.new(0, 2, 0)
+  local ok = pcall(function()
+    path:ComputeAsync(pathStart, pathFinish)
+  end)
+  local routePoints = {}
+  local useWindowClimb = false
+  if ok and path.Status == Enum.PathStatus.Success then
+    for _, waypoint in ipairs(path:GetWaypoints()) do
+      local waypointFloor = findFloor(waypoint.Position)
+      local floorPosition = waypointFloor and waypointFloor.Position or waypoint.Position
+      table.insert(routePoints, {
+        position = floorPosition + Vector3.new(0, 2, 0),
+        mode = "ground"
+      })
+    end
+  else
+    -- If the navmesh cannot find a doorway route, look for a clear
+    -- horizontal band above the solid wall: this is the window opening.
+    local horizontal = Vector3.new(
+      targetFloor.Position.X - startFloor.Position.X,
+      0,
+      targetFloor.Position.Z - startFloor.Position.Z
+    )
+    if horizontal.Magnitude < 0.1 then
+      warn("[INFECTION] No floor route or usable window direction was found.")
+      return false
+    end
+    local direction = horizontal.Unit
+    local wallOrigin = startFloor.Position + Vector3.new(0, 2, 0)
+    local wallHit = workspace:Raycast(wallOrigin, direction * horizontal.Magnitude, floorParams)
+    local clearHeight = nil
+    if wallHit then
+      for height = 2.5, 8.5, 0.5 do
+        local rayOrigin = startFloor.Position + Vector3.new(0, height, 0)
+        local rayTarget = targetFloor.Position + Vector3.new(0, height, 0)
+        local obstruction = workspace:Raycast(rayOrigin, rayTarget - rayOrigin, floorParams)
+        if not obstruction then
+          clearHeight = height
+          break
+        end
+      end
+    end
+    if not wallHit or not clearHeight then
+      warn("[INFECTION] No doorway path or clear window-height opening found. Check the window is open and unobstructed.")
+      return false
+    end
 
-		local outsideWall = wallHit.Position - direction * 1.4
-		local insideWall = wallHit.Position + direction * 1.4
-		local climbY = startFloor.Position.Y + clearHeight
-		table.insert(routePoints, {position = Vector3.new(outsideWall.X, climbY, outsideWall.Z), mode = "climb"})
-		table.insert(routePoints, {position = Vector3.new(insideWall.X, climbY, insideWall.Z), mode = "window"})
-		table.insert(routePoints, {position = targetFloor.Position + Vector3.new(0, 2, 0), mode = "descend"})
-		useWindowClimb = true
-		print("[INFECTION] Stage 4: navmesh route unavailable; climbing the wall and passing through a clear window-height opening.")
-	end
+    local outsideWall = wallHit.Position - direction * 1.4
+    local insideWall = wallHit.Position + direction * 1.4
+    local climbY = startFloor.Position.Y + clearHeight
+    table.insert(routePoints, {position = Vector3.new(outsideWall.X, climbY, outsideWall.Z), mode = "climb"})
+    table.insert(routePoints, {position = Vector3.new(insideWall.X, climbY, insideWall.Z), mode = "window"})
+    table.insert(routePoints, {position = targetFloor.Position + Vector3.new(0, 2, 0), mode = "descend"})
+    useWindowClimb = true
+    print("[INFECTION] Stage 4: navmesh route unavailable; climbing the wall and passing through a clear window-height opening.")
+  end
 
-	-- Six articulated legs handle Stage 4 locomotion. Two future nest-support
-	-- limbs are deliberately held back for the Stage 5 transformation.
-	local legs = {}
-	for i = 1, 6 do
-		legs[i] = makeWalkerLeg()
-	end
+  -- Six articulated legs handle Stage 4 locomotion. Two future nest-support
+  -- limbs are deliberately held back for the Stage 5 transformation.
+  local legs = {}
+  for i = 1, 6 do
+    legs[i] = makeWalkerLeg()
+  end
 
-	local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 0.65)
-	local current = startFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
-	infectionBulb.Position = current
-	if not useWindowClimb then
-		print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone with six walking tentacles.")
-	end
+  local bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 0.65)
+  local current = startFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
+  infectionBulb.Position = current
+  if not useWindowClimb then
+    print("[INFECTION] Stage 4: following the floor path into InfectionHouseZone with six walking tentacles.")
+  end
 
-	for _, routePoint in ipairs(routePoints) do
-		local destination = routePoint.position
-		local mode = routePoint.mode
-		local segmentStart = current
-		local distance = (destination - segmentStart).Magnitude
-		local steps = math.max(1, math.ceil(distance / 0.22))
+  for _, routePoint in ipairs(routePoints) do
+    local destination = routePoint.position
+    local mode = routePoint.mode
+    local segmentStart = current
+    local distance = (destination - segmentStart).Magnitude
+    local steps = math.max(1, math.ceil(distance / 0.22))
 
-		for step = 1, steps do
-			if not infectionBulb or not infectionBulb.Parent then
-				for _, leg in ipairs(legs) do
-					if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
-					if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
-				end
-				return false
-			end
+    for step = 1, steps do
+      if not infectionBulb or not infectionBulb.Parent then
+        for _, leg in ipairs(legs) do
+          if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
+          if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
+        end
+        return false
+      end
 
-			local alpha = step / steps
-			local nextPosition = segmentStart:Lerp(destination, alpha)
-			local facing = destination - segmentStart
-			if facing.Magnitude < 0.05 then facing = Vector3.new(0, 0, 1) end
-			local bob = math.sin(os.clock() * 7) * 0.07
-			infectionBulb.CFrame = CFrame.lookAt(
-				nextPosition + Vector3.new(0, bob, 0),
-				nextPosition + facing.Unit
-			)
+      local alpha = step / steps
+      local nextPosition = segmentStart:Lerp(destination, alpha)
+      local facing = destination - segmentStart
+      if facing.Magnitude < 0.05 then facing = Vector3.new(0, 0, 1) end
+      local bob = math.sin(os.clock() * 7) * 0.07
+      infectionBulb.CFrame = CFrame.lookAt(
+        nextPosition + Vector3.new(0, bob, 0),
+        nextPosition + facing.Unit
+      )
 
-			for legIndex, leg in ipairs(legs) do
-				local angle = (legIndex - 1) * (math.pi * 2 / 6)
-				local localRadial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-				local bodyFrame = infectionBulb.CFrame
-				local radial = bodyFrame:VectorToWorldSpace(localRadial)
-				radial = Vector3.new(radial.X, 0, radial.Z)
-				if radial.Magnitude < 0.05 then radial = localRadial end
-				radial = radial.Unit
-				local forward = bodyFrame.LookVector
-				forward = Vector3.new(forward.X, 0, forward.Z)
-				if forward.Magnitude < 0.05 then forward = Vector3.new(0, 0, -1) end
-				forward = forward.Unit
+      for legIndex, leg in ipairs(legs) do
+        local angle = (legIndex - 1) * (math.pi * 2 / 6)
+        local localRadial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+        local bodyFrame = infectionBulb.CFrame
+        local radial = bodyFrame:VectorToWorldSpace(localRadial)
+        radial = Vector3.new(radial.X, 0, radial.Z)
+        if radial.Magnitude < 0.05 then radial = localRadial end
+        radial = radial.Unit
+        local forward = bodyFrame.LookVector
+        forward = Vector3.new(forward.X, 0, forward.Z)
+        if forward.Magnitude < 0.05 then forward = Vector3.new(0, 0, -1) end
+        forward = forward.Unit
 
-				local phaseOffset = (legIndex % 2 == 0) and math.pi or 0
-				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * (math.pi * 2 / 3)
-				local stride = math.sin(phase)
-				local lift = math.max(0, math.cos(phase)) * 0.62
-				-- Bury the hip end slightly inside the bulb so the upper limb visibly
-				-- emerges from the body instead of appearing as a detached rod.
-				local hip = infectionBulb.Position + radial * (bulbRadius * 0.58) + Vector3.new(0, -0.16, 0)
-				local knee
-				local foot
+        local phaseOffset = (legIndex % 2 == 0) and math.pi or 0
+        local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * (math.pi * 2 / 3)
+        local stride = math.sin(phase)
+        local lift = math.max(0, math.cos(phase)) * 0.62
+        -- Bury the hip end slightly inside the bulb so the upper limb visibly
+        -- emerges from the body instead of appearing as a detached rod.
+        local hip = infectionBulb.Position + radial * (bulbRadius * 0.58) + Vector3.new(0, -0.16, 0)
+        local knee
+        local foot
 
-				if mode == "climb" or mode == "window" then
-					-- On the wall, legs fan outward and alternate their reach
-					-- vertically, keeping the body visibly braced against it.
-					local wallSide = (legIndex % 2 == 0) and 1 or -1
-					knee = hip + radial * 0.78 + Vector3.new(0, wallSide * 0.42, 0) + forward * stride * 0.22
-					foot = knee + radial * 0.72 + Vector3.new(0, wallSide * (0.48 + lift), 0)
-				else
-					-- The knee bends outward; the foot lifts and reaches forward
-					-- on its swing, rather than each leg simply hanging down.
-					knee = hip + radial * 0.88 + Vector3.new(0, -0.38 + lift * 0.35, 0) + forward * stride * 0.42
-					foot = infectionBulb.Position
-						+ radial * (2.05 + stride * 0.48)
-						+ forward * (stride * 0.62)
-						+ Vector3.new(0, -bulbRadius + 0.06 + lift, 0)
-				end
+        if mode == "climb" or mode == "window" then
+          -- On the wall, legs fan outward and alternate their reach
+          -- vertically, keeping the body visibly braced against it.
+          local wallSide = (legIndex % 2 == 0) and 1 or -1
+          knee = hip + radial * 0.78 + Vector3.new(0, wallSide * 0.42, 0) + forward * stride * 0.22
+          foot = knee + radial * 0.72 + Vector3.new(0, wallSide * (0.48 + lift), 0)
+        else
+          -- The knee bends outward; the foot lifts and reaches forward
+          -- on its swing, rather than each leg simply hanging down.
+          knee = hip + radial * 0.88 + Vector3.new(0, -0.38 + lift * 0.35, 0) + forward * stride * 0.42
+          foot = infectionBulb.Position
+            + radial * (2.05 + stride * 0.48)
+            + forward * (stride * 0.62)
+            + Vector3.new(0, -bulbRadius + 0.06 + lift, 0)
+        end
 
-				setCylinderBetween(leg.upper, hip, knee, 0.43)
-				setCylinderBetween(leg.lower, knee, foot, 0.29)
-				leg.upper.Transparency = 0
-				leg.lower.Transparency = 0
-			end
-			task.wait(0.06)
-		end
-		current = destination
-	end
+        setCylinderBetween(leg.upper, hip, knee, 0.43)
+        setCylinderBetween(leg.lower, knee, foot, 0.29)
+        leg.upper.Transparency = 0
+        leg.lower.Transparency = 0
+      end
+      task.wait(0.06)
+    end
+    current = destination
+  end
 
-	for _, leg in ipairs(legs) do
-		if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
-		if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
-	end
+  for _, leg in ipairs(legs) do
+    if leg.upper and leg.upper.Parent then leg.upper:Destroy() end
+    if leg.lower and leg.lower.Parent then leg.lower:Destroy() end
+  end
 
-	local finalFloor = findFloor(target.Position)
-	if finalFloor then
-		local settledPosition = finalFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
-		infectionBulb.Position = settledPosition
-	end
-	return (infectionBulb.Position - (targetFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0))).Magnitude < 10
+  local finalFloor = findFloor(target.Position)
+  if finalFloor then
+    local settledPosition = finalFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0)
+    infectionBulb.Position = settledPosition
+  end
+  return (infectionBulb.Position - (targetFloor.Position + Vector3.new(0, bulbRadius + 0.12, 0))).Magnitude < 10
 end
 
 local function setStageFiveVineBetween(vine, pointA, pointB, thickness)
-	local difference = pointB - pointA
-	local length = math.max(difference.Magnitude, 0.05)
-	local axis = difference.Unit
-	local up = Vector3.new(0, 1, 0) - axis * axis.Y
-	if up.Magnitude < 0.05 then
-		up = Vector3.new(1, 0, 0) - axis * axis.X
-	end
-	up = up.Unit
-	local side = axis:Cross(up).Unit
-	vine.Size = Vector3.new(length, thickness, thickness)
-	vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
+  local difference = pointB - pointA
+  local length = math.max(difference.Magnitude, 0.05)
+  local axis = difference.Unit
+  local up = Vector3.new(0, 1, 0) - axis * axis.Y
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(1, 0, 0) - axis * axis.X
+  end
+  up = up.Unit
+  local side = axis:Cross(up).Unit
+  vine.Size = Vector3.new(length, thickness, thickness)
+  vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
 end
 
 local function growStageFiveVine(name, pointA, pointB, thickness, duration)
-	local difference = pointB - pointA
-	local length = math.max(difference.Magnitude, 0.05)
-	local axis = difference.Unit
-	local vine = newCaptureVine(name, thickness)
-	vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
-	setStageFiveVineBetween(vine, pointA, pointA + axis * 0.03, thickness * 0.55)
+  local difference = pointB - pointA
+  local length = math.max(difference.Magnitude, 0.05)
+  local axis = difference.Unit
+  local vine = newCaptureVine(name, thickness)
+  vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
+  setStageFiveVineBetween(vine, pointA, pointA + axis * 0.03, thickness * 0.55)
 
-	local tween = TweenService:Create(
-		vine,
-		TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-		{Size = Vector3.new(length, thickness, thickness),
-		 CFrame = CFrame.fromMatrix(
-			(pointA + pointB) * 0.5,
-			axis,
-			(Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
-				and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
-				or Vector3.new(1, 0, 0),
-			axis:Cross(
-				(Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
-					and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
-					or Vector3.new(1, 0, 0)
-			).Unit
-		 )}
-	)
-	tween:Play()
-	return vine
+  local tween = TweenService:Create(
+    vine,
+    TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+    {Size = Vector3.new(length, thickness, thickness),
+     CFrame = CFrame.fromMatrix(
+      (pointA + pointB) * 0.5,
+      axis,
+      (Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
+        and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
+        or Vector3.new(1, 0, 0),
+      axis:Cross(
+        (Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
+          and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
+          or Vector3.new(1, 0, 0)
+      ).Unit
+     )}
+  )
+  tween:Play()
+  return vine
 end
 
 local function formStageFiveNest()
-	if not infectionBulb or not infectionBulb.Parent then return end
-	print("[INFECTION] Stage 5: the creature is extending its nest anchors.")
+  if not infectionBulb or not infectionBulb.Parent then return end
+  print("[INFECTION] Stage 5: the creature is extending its nest anchors.")
 
-	local floorParams = RaycastParams.new()
-	floorParams.FilterType = Enum.RaycastFilterType.Exclude
-	floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
-	floorParams.IgnoreWater = true
+  local floorParams = RaycastParams.new()
+  floorParams.FilterType = Enum.RaycastFilterType.Exclude
+  floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
+  floorParams.IgnoreWater = true
 
-	local startPosition = infectionBulb.Position
-	local startSize = infectionBulb.Size
-	local bulbRadius = math.max(startSize.Y * 0.5, 1)
-	local floorHit = workspace:Raycast(
-		startPosition + Vector3.new(0, 4, 0),
-		Vector3.new(0, -60, 0),
-		floorParams
-	)
-	local groundPosition = floorHit
-		and floorHit.Position + Vector3.new(0, 0.06, 0)
-		or Vector3.new(startPosition.X, startPosition.Y - bulbRadius + 0.06, startPosition.Z)
+  local startPosition = infectionBulb.Position
+  local startSize = infectionBulb.Size
+  local bulbRadius = math.max(startSize.Y * 0.5, 1)
+  local floorHit = workspace:Raycast(
+    startPosition + Vector3.new(0, 4, 0),
+    Vector3.new(0, -60, 0),
+    floorParams
+  )
+  local groundPosition = floorHit
+    and floorHit.Position + Vector3.new(0, 0.06, 0)
+    or Vector3.new(startPosition.X, startPosition.Y - bulbRadius + 0.06, startPosition.Z)
 
-	local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
-	local isIndoors = false
-	if houseZone and houseZone:IsA("BasePart") then
-		local localPosition = houseZone.CFrame:PointToObjectSpace(startPosition)
-		local halfSize = houseZone.Size * 0.5
-		isIndoors = math.abs(localPosition.X) <= halfSize.X
-			and math.abs(localPosition.Y) <= halfSize.Y
-			and math.abs(localPosition.Z) <= halfSize.Z
-	end
+  local houseZone = workspace:FindFirstChild("InfectionHouseZone", true)
+  local isIndoors = false
+  if houseZone and houseZone:IsA("BasePart") then
+    local localPosition = houseZone.CFrame:PointToObjectSpace(startPosition)
+    local halfSize = houseZone.Size * 0.5
+    isIndoors = math.abs(localPosition.X) <= halfSize.X
+      and math.abs(localPosition.Y) <= halfSize.Y
+      and math.abs(localPosition.Z) <= halfSize.Z
+  end
 
-	local directions = {
-		Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
-		Vector3.new(0, 0, 1), Vector3.new(0, 0, -1),
-		Vector3.new(1, 0, 1).Unit, Vector3.new(-1, 0, 1).Unit,
-		Vector3.new(1, 0, -1).Unit, Vector3.new(-1, 0, -1).Unit
-	}
-	local attachmentPoints = {}
-	local function addAttachment(position, normal)
-		if normal and math.abs(normal.Y) > 0.65 then return end
-		for _, existing in ipairs(attachmentPoints) do
-			if (existing.position - position).Magnitude < 4 then return end
-		end
-		table.insert(attachmentPoints, {position = position, normal = normal})
-	end
+  local directions = {
+    Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0),
+    Vector3.new(0, 0, 1), Vector3.new(0, 0, -1),
+    Vector3.new(1, 0, 1).Unit, Vector3.new(-1, 0, 1).Unit,
+    Vector3.new(1, 0, -1).Unit, Vector3.new(-1, 0, -1).Unit
+  }
+  local attachmentPoints = {}
+  local function addAttachment(position, normal)
+    if normal and math.abs(normal.Y) > 0.65 then return end
+    for _, existing in ipairs(attachmentPoints) do
+      if (existing.position - position).Magnitude < 4 then return end
+    end
+    table.insert(attachmentPoints, {position = position, normal = normal})
+  end
 
-	if isIndoors then
-		-- User-placed marker parts are optional overrides, not required objects.
-		for index = 1, 4 do
-			local marker = workspace:FindFirstChild("InfectionNestAnchor" .. index, true)
-			if marker and marker:IsA("BasePart") then
-				addAttachment(marker.Position, nil)
-			end
-		end
+  if isIndoors then
+    -- User-placed marker parts are optional overrides, not required objects.
+    for index = 1, 4 do
+      local marker = workspace:FindFirstChild("InfectionNestAnchor" .. index, true)
+      if marker and marker:IsA("BasePart") then
+        addAttachment(marker.Position, nil)
+      end
+    end
 
-		-- Automatically discover wall attachment points so Anchor 1 is not
-		-- dependent on a manually-created marker part.
-		for _, direction in ipairs(directions) do
-			if #attachmentPoints >= 4 then break end
-			local origin = startPosition + Vector3.new(0, rng:NextNumber(-0.35, 0.35), 0)
-			local hit = workspace:Raycast(origin, direction * 18, floorParams)
-			if hit and hit.Instance:IsA("BasePart")
-				and hit.Instance.CanCollide
-				and math.abs(hit.Normal.Y) < 0.65 then
-				addAttachment(hit.Position, hit.Normal)
-			end
-		end
-	end
+    -- Automatically discover wall attachment points so Anchor 1 is not
+    -- dependent on a manually-created marker part.
+    for _, direction in ipairs(directions) do
+      if #attachmentPoints >= 4 then break end
+      local origin = startPosition + Vector3.new(0, rng:NextNumber(-0.35, 0.35), 0)
+      local hit = workspace:Raycast(origin, direction * 18, floorParams)
+      if hit and hit.Instance:IsA("BasePart")
+        and hit.Instance.CanCollide
+        and math.abs(hit.Normal.Y) < 0.65 then
+        addAttachment(hit.Position, hit.Normal)
+      end
+    end
+  end
 
-	local anchorVines = {}
-	if isIndoors and #attachmentPoints >= 2 then
-		local attachmentCount = math.min(#attachmentPoints, 4)
-		for index = 1, attachmentCount do
-			local attachment = attachmentPoints[index]
-			local towardWall = attachment.position - startPosition
-			local radial = Vector3.new(towardWall.X, 0, towardWall.Z)
-			if radial.Magnitude < 0.05 then
-				radial = Vector3.new(math.cos(index * math.pi * 0.5), 0, math.sin(index * math.pi * 0.5))
-			else
-				radial = radial.Unit
-			end
-			local bulbSurface = startPosition + radial * (bulbRadius * 0.78)
-			local thickness = index <= 2 and 0.82 or 0.58
-			local duration = index <= 2 and rng:NextNumber(3.8, 4.6) or rng:NextNumber(2.8, 3.5)
-			local vine = growStageFiveVine(
-				"Stage5NestAnchor" .. index,
-				bulbSurface,
-				attachment.position,
-				thickness,
-				duration
-			)
-			table.insert(anchorVines, {
-				vine = vine,
-				wallPoint = attachment.position,
-				radial = radial,
-				thickness = thickness
-			})
-			task.wait(0.42)
-		end
+  local anchorVines = {}
+  if isIndoors and #attachmentPoints >= 2 then
+    local attachmentCount = math.min(#attachmentPoints, 4)
+    for index = 1, attachmentCount do
+      local attachment = attachmentPoints[index]
+      local towardWall = attachment.position - startPosition
+      local radial = Vector3.new(towardWall.X, 0, towardWall.Z)
+      if radial.Magnitude < 0.05 then
+        radial = Vector3.new(math.cos(index * math.pi * 0.5), 0, math.sin(index * math.pi * 0.5))
+      else
+        radial = radial.Unit
+      end
+      local bulbSurface = startPosition + radial * (bulbRadius * 0.78)
+      local thickness = index <= 2 and 0.82 or 0.58
+      local duration = index <= 2 and rng:NextNumber(3.8, 4.6) or rng:NextNumber(2.8, 3.5)
+      local vine = growStageFiveVine(
+        "Stage5NestAnchor" .. index,
+        bulbSurface,
+        attachment.position,
+        thickness,
+        duration
+      )
+      table.insert(anchorVines, {
+        vine = vine,
+        wallPoint = attachment.position,
+        radial = radial,
+        thickness = thickness
+      })
+      task.wait(0.42)
+    end
 
-		-- Let every anchor finish extending from the actual bulb before it lifts.
-		task.wait(4.8)
-		local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
-		local liftTween = TweenService:Create(
-			infectionBulb,
-			TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
-		)
-		liftTween:Play()
-		while liftTween.PlaybackState == Enum.PlaybackState.Playing do
-			if not infectionBulb or not infectionBulb.Parent then break end
-			local currentRadius = infectionBulb.Size.X * 0.5
-			for _, anchor in ipairs(anchorVines) do
-				if anchor.vine and anchor.vine.Parent then
-					local corePoint = infectionBulb.Position + anchor.radial * (currentRadius * 0.78)
-					setStageFiveVineBetween(anchor.vine, corePoint, anchor.wallPoint, anchor.thickness)
-				end
-			end
-			task.wait(0.05)
-		end
-		liftTween.Completed:Wait()
-	else
-		if isIndoors then
-			warn("[INFECTION] Not enough wall attachment surfaces were found. The creature will settle on the floor instead of floating unsupported.")
-		end
-		local settleTween = TweenService:Create(
-			infectionBulb,
-			TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-			{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
-		)
-		settleTween:Play()
-		settleTween.Completed:Wait()
-	end
+    -- Let every anchor finish extending from the actual bulb before it lifts.
+    task.wait(4.8)
+    local raisedPosition = groundPosition + Vector3.new(0, bulbRadius + 3.2, 0)
+    local liftTween = TweenService:Create(
+      infectionBulb,
+      TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+      {Position = raisedPosition, Size = Vector3.new(5.2, 5.2, 5.2)}
+    )
+    liftTween:Play()
+    while liftTween.PlaybackState == Enum.PlaybackState.Playing do
+      if not infectionBulb or not infectionBulb.Parent then break end
+      local currentRadius = infectionBulb.Size.X * 0.5
+      for _, anchor in ipairs(anchorVines) do
+        if anchor.vine and anchor.vine.Parent then
+          local corePoint = infectionBulb.Position + anchor.radial * (currentRadius * 0.78)
+          setStageFiveVineBetween(anchor.vine, corePoint, anchor.wallPoint, anchor.thickness)
+        end
+      end
+      task.wait(0.05)
+    end
+    liftTween.Completed:Wait()
+  else
+    if isIndoors then
+      warn("[INFECTION] Not enough wall attachment surfaces were found. The creature will settle on the floor instead of floating unsupported.")
+    end
+    local settleTween = TweenService:Create(
+      infectionBulb,
+      TweenInfo.new(3.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+      {Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
+    )
+    settleTween:Play()
+    settleTween.Completed:Wait()
+  end
 
-	-- Four substantial root supports rise from the actual floor and disappear
-	-- inside the lower half of the bulb. These are the visual legs of the nest.
-	local eggPointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
-	if eggPointsFolder then eggPointsFolder:Destroy() end
-	eggPointsFolder = Instance.new("Folder")
-	eggPointsFolder.Name = "StageFiveEggSpawnPoints"
-	eggPointsFolder.Parent = workspace
+  -- Four substantial root supports rise from the actual floor and disappear
+  -- inside the lower half of the bulb. These are the visual legs of the nest.
+  local eggPointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
+  if eggPointsFolder then eggPointsFolder:Destroy() end
+  eggPointsFolder = Instance.new("Folder")
+  eggPointsFolder.Name = "StageFiveEggSpawnPoints"
+  eggPointsFolder.Parent = workspace
 
-	local rootTips = {}
-	for index = 1, 4 do
-		local angle = (index - 1) * math.pi * 0.5 + math.pi * 0.25
-		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
-			+ Vector3.new(0, 3, 0)
-		local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -100, 0), floorParams)
-		if actualFloor and actualFloor.Normal.Y > 0.82 then
-			local base = actualFloor.Position + actualFloor.Normal * 0.08
-			local insideBulb = infectionBulb.Position
-				- Vector3.new(0, bulbRadius * 0.48, 0) + radial * (bulbRadius * 0.24)
-			local support = growStageFiveVine(
-				"Stage5RootSupport" .. index, base, insideBulb,
-				0.78, rng:NextNumber(3.2, 4.0)
-			)
-			table.insert(rootTips, {position = base, direction = radial, support = support})
+  local rootTips = {}
+  for index = 1, 4 do
+    local angle = (index - 1) * math.pi * 0.5 + math.pi * 0.25
+    local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+    local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
+      + Vector3.new(0, 3, 0)
+    local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -100, 0), floorParams)
+    if actualFloor and actualFloor.Normal.Y > 0.82 then
+      local base = actualFloor.Position + actualFloor.Normal * 0.08
+      local insideBulb = infectionBulb.Position
+        - Vector3.new(0, bulbRadius * 0.48, 0) + radial * (bulbRadius * 0.24)
+      local support = growStageFiveVine(
+        "Stage5RootSupport" .. index, base, insideBulb,
+        0.78, rng:NextNumber(3.2, 4.0)
+      )
+      table.insert(rootTips, {position = base, direction = radial, support = support})
 
-			local eggPoint = Instance.new("Part")
-			eggPoint.Name = "EggPoint" .. index
-			eggPoint.Anchored = true
-			eggPoint.Transparency = 1
-			eggPoint.CanCollide = false
-			eggPoint.CanTouch = false
-			eggPoint.CanQuery = false
-			eggPoint.Size = Vector3.new(0.2, 0.2, 0.2)
-			eggPoint.Position = base
-			eggPoint.Parent = eggPointsFolder
+      local eggPoint = Instance.new("Part")
+      eggPoint.Name = "EggPoint" .. index
+      eggPoint.Anchored = true
+      eggPoint.Transparency = 1
+      eggPoint.CanCollide = false
+      eggPoint.CanTouch = false
+      eggPoint.CanQuery = false
+      eggPoint.Size = Vector3.new(0.2, 0.2, 0.2)
+      eggPoint.Position = base
+      eggPoint.Parent = eggPointsFolder
 
-			-- Smaller veins visibly branch out of each thick support and feed
-			-- back into the bulb instead of ending as isolated floating braces.
-			for veinIndex = 1, 2 do
-				local heightAlpha = veinIndex == 1 and 0.42 or 0.7
-				local veinStart = base:Lerp(insideBulb, heightAlpha)
-				local sideways = Vector3.new(-radial.Z, 0, radial.X)
-				local veinEnd = veinStart + radial * 1.25 + sideways * (veinIndex == 1 and 0.7 or -0.7)
-				growStageFiveVine(
-					"Stage5SupportVein", veinStart, veinEnd,
-					0.2, rng:NextNumber(1.0, 1.5)
-				)
-			end
+      -- Smaller veins visibly branch out of each thick support and feed
+      -- back into the bulb instead of ending as isolated floating braces.
+      for veinIndex = 1, 2 do
+        local heightAlpha = veinIndex == 1 and 0.42 or 0.7
+        local veinStart = base:Lerp(insideBulb, heightAlpha)
+        local sideways = Vector3.new(-radial.Z, 0, radial.X)
+        local veinEnd = veinStart + radial * 1.25 + sideways * (veinIndex == 1 and 0.7 or -0.7)
+        growStageFiveVine(
+          "Stage5SupportVein", veinStart, veinEnd,
+          0.2, rng:NextNumber(1.0, 1.5)
+        )
+      end
 
-			-- Three low, branching runners crawl outward from every support base.
-			for branchIndex = 1, 3 do
-				local spread = (branchIndex - 2) * math.rad(52)
-				local direction = CFrame.fromAxisAngle(Vector3.yAxis, spread):VectorToWorldSpace(radial)
-				local distance = rng:NextNumber(5.5, 8.5)
-				local previous = base
-				for segmentIndex = 1, 4 do
-					local alpha = segmentIndex / 4
-					local drift = Vector3.new(0, 0, 0)
-					if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.35) end
-					if segmentIndex == 3 then drift = Vector3.new(0, 0, -0.25) end
-					local probe = base + direction * (distance * alpha) + drift + Vector3.new(0, 2, 0)
-					local ground = workspace:Raycast(probe, Vector3.new(0, -8, 0), floorParams)
-					if ground and ground.Normal.Y > 0.82 then
-						local nextPoint = ground.Position + ground.Normal * 0.07
-						growStageFiveVine(
-							"Stage5GroundCrawlerVine", previous, nextPoint,
-							math.max(0.13, 0.28 - segmentIndex * 0.025),
-						 rng:NextNumber(0.65, 1.0)
-						)
-						previous = nextPoint
-					end
-				end
-			end
-		end
-		task.wait(0.3)
-	end
+      -- Three low, branching runners crawl outward from every support base.
+      for branchIndex = 1, 3 do
+        local spread = (branchIndex - 2) * math.rad(52)
+        local direction = CFrame.fromAxisAngle(Vector3.yAxis, spread):VectorToWorldSpace(radial)
+        local distance = rng:NextNumber(5.5, 8.5)
+        local previous = base
+        for segmentIndex = 1, 4 do
+          local alpha = segmentIndex / 4
+          local drift = Vector3.new(0, 0, 0)
+          if segmentIndex == 2 then drift = Vector3.new(0, 0, 0.35) end
+          if segmentIndex == 3 then drift = Vector3.new(0, 0, -0.25) end
+          local probe = base + direction * (distance * alpha) + drift + Vector3.new(0, 2, 0)
+          local ground = workspace:Raycast(probe, Vector3.new(0, -8, 0), floorParams)
+          if ground and ground.Normal.Y > 0.82 then
+            local nextPoint = ground.Position + ground.Normal * 0.07
+            growStageFiveVine(
+              "Stage5GroundCrawlerVine", previous, nextPoint,
+              math.max(0.13, 0.28 - segmentIndex * 0.025),
+             rng:NextNumber(0.65, 1.0)
+            )
+            previous = nextPoint
+          end
+        end
+      end
+    end
+    task.wait(0.3)
+  end
 
-	-- Allow the supports and floor runners to finish extending before the
-	-- ordinary ground-growth network branches out from their real floor bases.
-	task.wait(4.0)
-	for _, root in ipairs(rootTips) do
-		registerGroundAnchor(root.position, Vector3.new(0, 1, 0))
-	end
+  -- Allow the supports and floor runners to finish extending before the
+  -- ordinary ground-growth network branches out from their real floor bases.
+  task.wait(4.0)
+  for _, root in ipairs(rootTips) do
+    registerGroundAnchor(root.position, Vector3.new(0, 1, 0))
+  end
 end
 
 local stageFourTransitionRunning = false
 
 local function startStageFourRelocation()
-	if stageFourTransitionRunning or growthStage >= 4 then
-		return false
-	end
-	stageFourTransitionRunning = true
-	growthStage = 4
-	workspace:SetAttribute("InfectionStage", growthStage)
-	relocationStarted = true
+  if stageFourTransitionRunning or growthStage >= 4 then
+    return false
+  end
+  stageFourTransitionRunning = true
+  growthStage = 4
+  workspace:SetAttribute("InfectionStage", growthStage)
+  relocationStarted = true
 
-	-- Publish the live bulb reference so the two existing Stage 3 crawlers
-	-- can escort it during relocation without guessing its original position.
-	local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
-	if not bulbReference then
-		bulbReference = Instance.new("ObjectValue")
-		bulbReference.Name = "InfectionBulbReference"
-		bulbReference.Parent = workspace
-	end
-	bulbReference.Value = infectionBulb
-	workspace:SetAttribute("StageFourRelocating", true)
+  -- Publish the live bulb reference so the two existing Stage 3 crawlers
+  -- can escort it during relocation without guessing its original position.
+  local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+  if not bulbReference then
+    bulbReference = Instance.new("ObjectValue")
+    bulbReference.Name = "InfectionBulbReference"
+    bulbReference.Parent = workspace
+  end
+  bulbReference.Value = infectionBulb
+  workspace:SetAttribute("StageFourRelocating", true)
 
-	print("[INFECTION] Stage 4 relocation started.")
+  print("[INFECTION] Stage 4 relocation started.")
 
-	-- Finish resizing the body before calculating limb attachment points.
-	-- Previously the bulb kept growing while the legs were already walking,
-	-- making their roots appear to pull away from the expanding body.
-	local sizeTween
-	if infectionBulb and infectionBulb.Parent then
-		sizeTween = TweenService:Create(
-			infectionBulb,
-			TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-			{Size = Vector3.new(4.3, 4.3, 4.3)}
-		)
-		sizeTween:Play()
-	end
+  -- Finish resizing the body before calculating limb attachment points.
+  -- Previously the bulb kept growing while the legs were already walking,
+  -- making their roots appear to pull away from the expanding body.
+  local sizeTween
+  if infectionBulb and infectionBulb.Parent then
+    sizeTween = TweenService:Create(
+      infectionBulb,
+      TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+      {Size = Vector3.new(4.3, 4.3, 4.3)}
+    )
+    sizeTween:Play()
+  end
 
-	retractStageThreeTendrils()
-	if sizeTween then
-		sizeTween.Completed:Wait()
-	end
-	task.wait(0.4)
+  retractStageThreeTendrils()
+  if sizeTween then
+    sizeTween.Completed:Wait()
+  end
+  task.wait(0.4)
 
-	if crawlToNestTarget() then
-		growthStage = 5
-		workspace:SetAttribute("InfectionStage", growthStage)
-		relocationStarted = false
-		workspace:SetAttribute("StageFourRelocating", false)
-		local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
-		if bulbReference and bulbReference:IsA("ObjectValue") then
-			bulbReference.Value = nil
-		end
-		formStageFiveNest()
-		print("[INFECTION] Stage 5 nest established.")
-	else
-		workspace:SetAttribute("StageFourRelocating", false)
-		local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
-		if bulbReference and bulbReference:IsA("ObjectValue") then
-			bulbReference.Value = nil
-		end
-		warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
-	end
-	stageFourTransitionRunning = false
-	return true
+  if crawlToNestTarget() then
+    growthStage = 5
+    workspace:SetAttribute("InfectionStage", growthStage)
+    relocationStarted = false
+    workspace:SetAttribute("StageFourRelocating", false)
+    local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+    if bulbReference and bulbReference:IsA("ObjectValue") then
+      bulbReference.Value = nil
+    end
+    formStageFiveNest()
+    print("[INFECTION] Stage 5 nest established.")
+  else
+    workspace:SetAttribute("StageFourRelocating", false)
+    local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+    if bulbReference and bulbReference:IsA("ObjectValue") then
+      bulbReference.Value = nil
+    end
+    warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
+  end
+  stageFourTransitionRunning = false
+  return true
 end
 
 local function runInfectionStageController()
-	stageClock = os.clock()
-	while infectionFolder.Parent and growthStage < 4 do
-		task.wait(2)
-		local elapsed = os.clock() - stageClock
-		local count = #growthSegments
-		if growthStage == 1 and elapsed >= 75 and count >= 5 then
-			growthStage = 2
-			workspace:SetAttribute("InfectionStage", growthStage)
-			stageClock = os.clock()
-			setBulbSize(2.2, 12)
-			print("[INFECTION] Stage 2: the bulb is developing.")
-			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
-			for index = 1, 4 do
-				local angle = (index - 1) * math.pi * 0.5
-				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 18, 0)
-			end
-		elseif growthStage == 2 and elapsed >= 115 and count >= 35 then
-			growthStage = 3
-			workspace:SetAttribute("InfectionStage", growthStage)
-			stageClock = os.clock()
-			stageThreeStartedAt = stageClock
-			setBulbSize(3.8, 18)
-			print("[INFECTION] Stage 3: mature parasite growth. Original growth settings restored.")
-			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
-			for index = 1, 8 do
-				local angle = (index - 1) * math.pi * 0.25
-				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
-			end
-		elseif growthStage == 3 and elapsed >= 180 and count >= 120 then
-				startStageFourRelocation()
-		end
-	end
+  stageClock = os.clock()
+  while infectionFolder.Parent and growthStage < 4 do
+    task.wait(2)
+    local elapsed = os.clock() - stageClock
+    local count = #growthSegments
+    if growthStage == 1 and elapsed >= 75 and count >= 5 then
+      growthStage = 2
+      workspace:SetAttribute("InfectionStage", growthStage)
+      stageClock = os.clock()
+      setBulbSize(2.2, 12)
+      print("[INFECTION] Stage 2: the bulb is developing.")
+      local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+      for index = 1, 4 do
+        local angle = (index - 1) * math.pi * 0.5
+        task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 18, 0)
+      end
+    elseif growthStage == 2 and elapsed >= 115 and count >= 35 then
+      growthStage = 3
+      workspace:SetAttribute("InfectionStage", growthStage)
+      stageClock = os.clock()
+      stageThreeStartedAt = stageClock
+      setBulbSize(3.8, 18)
+      print("[INFECTION] Stage 3: mature parasite growth. Original growth settings restored.")
+      local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+      for index = 1, 8 do
+        local angle = (index - 1) * math.pi * 0.25
+        task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
+      end
+    elseif growthStage == 3 and elapsed >= 180 and count >= 120 then
+        startStageFourRelocation()
+    end
+  end
 end
 
 --------------------------------------------------
@@ -3633,58 +3633,58 @@ end
 --------------------------------------------------
 
 local function handleDeveloperChatCommand(player, message)
-	local requestedStage = message:match("^%s*/stage%s+(%d+)%s*$")
-	if requestedStage ~= "3" and requestedStage ~= "4" then return end
+  local requestedStage = message:match("^%s*/stage%s+(%d+)%s*$")
+  if requestedStage ~= "3" and requestedStage ~= "4" then return end
 
-	if stageFourTransitionRunning then
-		warn("[INFECTION] A Stage 4 transition is already running.")
-		return
-	end
+  if stageFourTransitionRunning then
+    warn("[INFECTION] A Stage 4 transition is already running.")
+    return
+  end
 
-	if requestedStage == "3" then
-		if growthStage >= 4 then
-			warn("[INFECTION] Cannot set Stage 3 after relocation has started.")
-			return
-		end
+  if requestedStage == "3" then
+    if growthStage >= 4 then
+      warn("[INFECTION] Cannot set Stage 3 after relocation has started.")
+      return
+    end
 
-		local wasAlreadyStageThree = growthStage == 3
-		growthStage = 3
-		workspace:SetAttribute("InfectionStage", growthStage)
-		relocationStarted = false
-		stageClock = os.clock()
-		stageThreeStartedAt = stageClock
-		setBulbSize(3.8, 3)
+    local wasAlreadyStageThree = growthStage == 3
+    growthStage = 3
+    workspace:SetAttribute("InfectionStage", growthStage)
+    relocationStarted = false
+    stageClock = os.clock()
+    stageThreeStartedAt = stageClock
+    setBulbSize(3.8, 3)
 
-		if not wasAlreadyStageThree then
-			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
-			for index = 1, 8 do
-				local angle = (index - 1) * math.pi * 0.25
-				task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
-			end
-		end
+    if not wasAlreadyStageThree then
+      local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
+      for index = 1, 8 do
+        local angle = (index - 1) * math.pi * 0.25
+        task.spawn(growBranch, origin, Vector3.new(0, 1, 0), Vector3.new(math.cos(angle), 0, math.sin(angle)), 32, 0)
+      end
+    end
 
-		print("[INFECTION] " .. player.Name .. " used /stage 3. Mature growth started; the Stage 4 timer has been reset.")
-		return
-	end
+    print("[INFECTION] " .. player.Name .. " used /stage 3. Mature growth started; the Stage 4 timer has been reset.")
+    return
+  end
 
-	if growthStage >= 4 then
-		warn("[INFECTION] The parasite has already reached Stage " .. tostring(growthStage) .. ".")
-		return
-	end
+  if growthStage >= 4 then
+    warn("[INFECTION] The parasite has already reached Stage " .. tostring(growthStage) .. ".")
+    return
+  end
 
-	print("[INFECTION] " .. player.Name .. " used /stage 4.")
-	task.spawn(startStageFourRelocation)
+  print("[INFECTION] " .. player.Name .. " used /stage 4.")
+  task.spawn(startStageFourRelocation)
 end
 
 -- Legacy chat support.
 local function connectStageChatCommand(player)
-	player.Chatted:Connect(function(message)
-		handleDeveloperChatCommand(player, message)
-	end)
+  player.Chatted:Connect(function(message)
+    handleDeveloperChatCommand(player, message)
+  end)
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
-	connectStageChatCommand(player)
+  connectStageChatCommand(player)
 end
 Players.PlayerAdded:Connect(connectStageChatCommand)
 
@@ -3692,17 +3692,17 @@ Players.PlayerAdded:Connect(connectStageChatCommand)
 -- the new chat system routes away from Player.Chatted.
 local stageTextCommand = TextChatService:FindFirstChild("StageFourTextCommand")
 if not stageTextCommand then
-	stageTextCommand = Instance.new("TextChatCommand")
-	stageTextCommand.Name = "StageFourTextCommand"
-	stageTextCommand.PrimaryAlias = "/stage"
-	stageTextCommand.Parent = TextChatService
+  stageTextCommand = Instance.new("TextChatCommand")
+  stageTextCommand.Name = "StageFourTextCommand"
+  stageTextCommand.PrimaryAlias = "/stage"
+  stageTextCommand.Parent = TextChatService
 end
 
 stageTextCommand.Triggered:Connect(function(textSource, unfilteredText)
-	local player = Players:GetPlayerByUserId(textSource.UserId)
-	if player then
-		handleDeveloperChatCommand(player, unfilteredText)
-	end
+  local player = Players:GetPlayerByUserId(textSource.UserId)
+  if player then
+    handleDeveloperChatCommand(player, unfilteredText)
+  end
 end)
 
 --------------------------------------------------
@@ -3710,46 +3710,46 @@ end)
 --------------------------------------------------
 
 local function pointInsideGrowthBoost(part, point)
-	local localPoint = part.CFrame:PointToObjectSpace(point)
-	local half = part.Size * 0.5
-	return math.abs(localPoint.X) <= half.X
-		and math.abs(localPoint.Y) <= half.Y
-		and math.abs(localPoint.Z) <= half.Z
+  local localPoint = part.CFrame:PointToObjectSpace(point)
+  local half = part.Size * 0.5
+  return math.abs(localPoint.X) <= half.X
+    and math.abs(localPoint.Y) <= half.Y
+    and math.abs(localPoint.Z) <= half.Z
 end
 
 local function runGrowthBoostPartWatcher()
-	local wasTouching = false
-	while infectionFolder.Parent do
-		local boostPart = workspace:FindFirstChild("InfectionGrowthBoost", true)
-		local touching = false
+  local wasTouching = false
+  while infectionFolder.Parent do
+    local boostPart = workspace:FindFirstChild("InfectionGrowthBoost", true)
+    local touching = false
 
-		if boostPart and boostPart:IsA("BasePart") then
-			if infectionBulb and infectionBulb.Parent
-				and pointInsideGrowthBoost(boostPart, infectionBulb.Position) then
-				touching = true
-			end
+    if boostPart and boostPart:IsA("BasePart") then
+      if infectionBulb and infectionBulb.Parent
+        and pointInsideGrowthBoost(boostPart, infectionBulb.Position) then
+        touching = true
+      end
 
-			if not touching then
-				for _, segment in ipairs(growthSegments) do
-					if segment and segment.Parent
-						and pointInsideGrowthBoost(boostPart, segment.Position) then
-						touching = true
-						break
-					end
-				end
-			end
-		end
+      if not touching then
+        for _, segment in ipairs(growthSegments) do
+          if segment and segment.Parent
+            and pointInsideGrowthBoost(boostPart, segment.Position) then
+            touching = true
+            break
+          end
+        end
+      end
+    end
 
-		if touching and not wasTouching then
-			-- This is a developer testing zone: every fresh entry can trigger
-			-- the boost immediately, with no cooldown between activations.
-			growthBoostUntil = os.clock() + GROWTH_BOOST_DURATION
-			print("[INFECTION] Developer growth zone touched! Growth speed increased 15x for 60 seconds.")
-		end
+    if touching and not wasTouching then
+      -- This is a developer testing zone: every fresh entry can trigger
+      -- the boost immediately, with no cooldown between activations.
+      growthBoostUntil = os.clock() + GROWTH_BOOST_DURATION
+      print("[INFECTION] Developer growth zone touched! Growth speed increased 15x for 60 seconds.")
+    end
 
-		wasTouching = touching
-		task.wait(0.35)
-	end
+    wasTouching = touching
+    task.wait(0.35)
+  end
 end
 
 --------------------------------------------------
@@ -3761,13 +3761,13 @@ print("[INFECTION] Starting infection system...")
 local startingSurface = findStartingSurface()
 
 if not startingSurface then
-	warn("[INFECTION] ERROR: No starting surface found near InfectionSpawner.")
-	return
+  warn("[INFECTION] ERROR: No starting surface found near InfectionSpawner.")
+  return
 end
 
 local startPosition =
-	startingSurface.Position
-	+ startingSurface.Normal * SURFACE_OFFSET
+  startingSurface.Position
+  + startingSurface.Normal * SURFACE_OFFSET
 
 local startNormal = startingSurface.Normal
 
@@ -3777,42 +3777,42 @@ registerCeilingAnchor(startPosition, startNormal)
 
 -- Create the infection's starting bulb.
 infectionBulb = createSpawnerBulb(
-	startingSurface.Position,
-	startingSurface.Normal
+  startingSurface.Position,
+  startingSurface.Normal
 )
 
 -- Choose an initial growth direction.
 local startDirection = getPlayerFacingDirection(startPosition)
 
 startDirection =
-	startDirection
+  startDirection
 - startNormal * startDirection:Dot(startNormal)
 
 if startDirection.Magnitude < 0.05 then
-	local fallbackAxis
+  local fallbackAxis
 
-	if math.abs(startNormal.Z) < 0.9 then
-		fallbackAxis = Vector3.new(0, 0, 1)
-	else
-		fallbackAxis = Vector3.new(1, 0, 0)
-	end
+  if math.abs(startNormal.Z) < 0.9 then
+    fallbackAxis = Vector3.new(0, 0, 1)
+  else
+    fallbackAxis = Vector3.new(1, 0, 0)
+  end
 
-	startDirection =
-		fallbackAxis
-	- startNormal * fallbackAxis:Dot(startNormal)
+  startDirection =
+    fallbackAxis
+  - startNormal * fallbackAxis:Dot(startNormal)
 end
 
 startDirection = startDirection.Unit
 
 -- Start the main infection growth.
 task.spawn(function()
-	growBranch(
-		startPosition,
-		startNormal,
-		startDirection,
-		rng:NextInteger(5, 7),
-		0
-	)
+  growBranch(
+    startPosition,
+    startNormal,
+    startDirection,
+    rng:NextInteger(5, 7),
+    0
+  )
 end)
 
 -- Start progression and the player-reactive systems.
