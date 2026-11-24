@@ -145,7 +145,7 @@ local function nearestVisiblePlayer(position)
 
   for _, player in ipairs(Players:GetPlayers()) do
     local character, root, torso = getCharacterParts(player)
-    if root and torso then
+    if root and torso and player:GetAttribute("IsInfected") ~= true then
       local distance = (root.Position - position).Magnitude
       if distance < bestDistance and canSeeTarget(position, character, torso) then
         best = {
@@ -295,6 +295,12 @@ local function makeCrawler(startPosition, startNormal)
   end
 
   local function updateTarget()
+    if targetInfo and targetInfo.player:GetAttribute("IsInfected") == true then
+      targetInfo = nil
+      lastKnownPosition = nil
+      lastSeenAt = 0
+    end
+
     local visible = nearestVisiblePlayer(position)
     if visible then
       targetInfo = visible
@@ -601,6 +607,7 @@ local function createEgg(position, surfaceNormal)
   local egg = makePart(folder, "CrawlerEgg", Enum.PartType.Ball,
     Vector3.new(0.3, 0.43, 0.3), Color3.fromRGB(248, 207, 64))
   egg.Material = Enum.Material.SmoothPlastic
+  egg.Transparency = 0.24
   egg.Position = position - normal * 0.1
   egg.CFrame = CFrame.lookAt(egg.Position, egg.Position + normal)
   egg:SetAttribute("EggReadyToHatch", false)
