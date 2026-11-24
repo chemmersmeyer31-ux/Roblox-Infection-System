@@ -1471,7 +1471,6 @@ local function setCylinderBetween(part, pointA, pointB, thickness)
 		up,
 		side
 	)
-	part.Transparency = 0
 end
 
 local function newCaptureVine(name, thickness)
@@ -3219,7 +3218,7 @@ local function crawlToNestTarget()
 				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * (math.pi * 2 / 3)
 				local stride = math.sin(phase)
 				local lift = math.max(0, math.cos(phase)) * 0.62
-						local hip = infectionBulb.Position + radial * (bulbRadius * 0.88) + Vector3.new(0, -0.18, 0)
+				local hip = infectionBulb.Position + radial * (bulbRadius * 0.88) + Vector3.new(0, -0.18, 0)
 				local knee
 				local foot
 
@@ -3241,6 +3240,8 @@ local function crawlToNestTarget()
 
 				setCylinderBetween(leg.upper, hip, knee, 0.43)
 				setCylinderBetween(leg.lower, knee, foot, 0.29)
+				leg.upper.Transparency = 0
+				leg.lower.Transparency = 0
 			end
 			task.wait(0.06)
 		end
