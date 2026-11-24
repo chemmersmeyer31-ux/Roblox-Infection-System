@@ -3315,6 +3315,16 @@ local function formStageFiveNest()
   if not infectionBulb or not infectionBulb.Parent then return end
   print("[INFECTION] Stage 5: the creature is extending its nest anchors.")
 
+  -- Keep publishing the live core position after Stage 4 relocation ends.
+  local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+  if not bulbReference or not bulbReference:IsA("ObjectValue") then
+    if bulbReference then bulbReference:Destroy() end
+    bulbReference = Instance.new("ObjectValue")
+    bulbReference.Name = "InfectionBulbReference"
+    bulbReference.Parent = workspace
+  end
+  bulbReference.Value = infectionBulb
+
   local floorParams = RaycastParams.new()
   floorParams.FilterType = Enum.RaycastFilterType.Exclude
   floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
