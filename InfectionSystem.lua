@@ -2170,15 +2170,13 @@ local function performCeilingHoist(
       1
     )
 
-    updateCocoonEntanglement(finalEntanglement, root, 1)
-    updateOuterVineLayer(outerLayer, root, 1)
+    updateBodyEntanglement(finalEntanglement, root, 1)
     updateHoistVines(vines, root, alpha)
 
     task.wait(0.035)
   end
 
-  updateCocoonEntanglement(finalEntanglement, root, 1)
-  updateOuterVineLayer(outerLayer, root, 1)
+  updateBodyEntanglement(finalEntanglement, root, 1)
   updateHoistVines(vines, root, 1)
 
   print("[INFECTION] Ceiling vines attached. Beginning cocoon hoist.")
@@ -2220,8 +2218,7 @@ local function performCeilingHoist(
     root.CFrame =
       hoistStartCFrame + Vector3.new(0, rise, 0)
 
-    updateCocoonEntanglement(finalEntanglement, root, 1)
-    updateOuterVineLayer(outerLayer, root, 1)
+    updateBodyEntanglement(finalEntanglement, root, 1)
     updateHoistVines(vines, root, 1)
 
     task.wait(0.035)
@@ -2345,7 +2342,9 @@ local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, t
   end
 
   infectedCharacter.Name = player.Name
-  infectedCharacter:PivotTo(targetCFrame)
+  -- Align the replacement rig's HumanoidRootPart to the captured root.
+  local pivotToRoot = infectedCharacter:GetPivot():ToObjectSpace(infectedRoot.CFrame)
+  infectedCharacter:PivotTo(targetCFrame * pivotToRoot:Inverse())
   infectedCharacter.Parent = workspace
 
   -- Keep the replacement physically fixed inside the cocoon until its release.
@@ -2485,12 +2484,11 @@ local function performInfectedDescent(
   root,
   humanoid,
   finalEntanglement,
-  outerLayer,
   hoistVines,
   roofResult,
   restoreState
 )
-  print("[INFECTION] Cocoon holding captured player.")
+  print("[INFECTION] Living vines holding captured player.")
 
   -- Prepare the replacement before changing anything about the original avatar.
   local infectedCharacter = prepareInfectedCharacter()
@@ -2550,8 +2548,7 @@ local function performInfectedDescent(
       return false
     end
 
-    updateCocoonEntanglement(finalEntanglement, infectedRoot, 1)
-    updateOuterVineLayer(outerLayer, infectedRoot, 1)
+    updateBodyEntanglement(finalEntanglement, infectedRoot, 1)
     if hoistVines then
       updateHoistVines(hoistVines, infectedRoot, 1)
     end
@@ -2562,10 +2559,10 @@ local function performInfectedDescent(
     return false
   end
 
-  print("[INFECTION] Cocoon opening around the infected character.")
+  print("[INFECTION] Wrapping vines loosening around the infected character.")
 
-  -- Retract the cocoon while the support vines are STILL holding it at the roof.
-  retractCocoonLayer(outerLayer)
+  -- Retract the original wrapping vines while the support vines still hold
+  -- the player at the roof.
   retractCocoonLayer(finalEntanglement)
 
   -- One final update keeps the support vines aligned with the new character.
@@ -2772,7 +2769,6 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
     task.wait(0.035)
   end
 
-  local outerLayer = nil
   local finalEntanglement = nil
   local hoistVines = nil
   local sealed = false
@@ -2809,57 +2805,17 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
       animateScript.Disabled = true
     end
 
-    print("[INFECTION] Player frozen. Preparing direct cocoon formation.")
+    print("[INFECTION] Player secured by the first wrapping vines.")
 
-    local cocoonStart = os.clock()
-
-    while os.clock() - cocoonStart < COCOON_START_DELAY
-      and humanoid.Health > 0
-      and character.Parent do
-
-      holdPlayer(false)
-      task.wait(0.035)
-    end
-
+    -- The first body-wrapping vines are the entire restraint. No separate
+    -- spherical shell or second outer layer is created.
     if humanoid.Health > 0 and character.Parent then
+      finalEntanglement = entanglement
       local cocoonData = {
         targetSize = getCharacterCocoonBounds(root)
       }
-
-      finalEntanglement =
-        createCocoonEntanglement(root, cocoonData)
-
-      outerLayer = createOuterVineLayer(root)
-
       sealed = true
-
-      print("[INFECTION] Complete closed cocoon forming.")
-
-      local layerStart = os.clock()
-
-      while os.clock() - layerStart < OUTER_LAYER_FORM_TIME
-        and humanoid.Health > 0
-        and character.Parent do
-
-        local alpha = math.clamp(
-          (os.clock() - layerStart) / OUTER_LAYER_FORM_TIME,
-          0,
-          1
-        )
-
-        updateCocoonEntanglement(
-          finalEntanglement,
-          root,
-          alpha
-        )
-
-        updateOuterVineLayer(outerLayer, root, alpha)
-
-        task.wait(0.035)
-      end
-
-      updateCocoonEntanglement(finalEntanglement, root, 1)
-      updateOuterVineLayer(outerLayer, root, 1)
+      updateBodyEntanglement(finalEntanglement, root, 1)
 
       -- Remove the temporary body-wrapping vines.
       for _, strand in ipairs(entanglement.strands) do
@@ -2881,7 +2837,7 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
 
       table.clear(arms)
 
-      print("[INFECTION] Ground vines released the sealed cocoon.")
+      print("[INFECTION] Ground vines released the wrapped player.")
 
       -- Search for a suitable roof.
       roofResult = findHoistRoof(root, cocoonData)
@@ -2892,8 +2848,7 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
             root,
             cocoonData,
             roofResult,
-            finalEntanglement,
-            outerLayer
+            finalEntanglement
           )
 
         if hoisted then
@@ -2920,7 +2875,6 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
         root,
         humanoid,
         finalEntanglement,
-        outerLayer,
         hoistVines,
         roofResult,
         restoreState
@@ -2973,11 +2927,7 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
     end
   end
 
-  -- These layers may already have been destroyed during retraction.
-  if outerLayer then
-    destroyVineLayer(outerLayer)
-  end
-
+  -- The wrapping layer may already have been destroyed during retraction.
   if finalEntanglement then
     destroyVineLayer(finalEntanglement)
   end
@@ -3325,9 +3275,15 @@ local function formStageFiveNest()
   end
   bulbReference.Value = infectionBulb
 
+  local floorIgnore = {spawner, infectionFolder}
+  for _, player in ipairs(Players:GetPlayers()) do
+    if player.Character then
+      table.insert(floorIgnore, player.Character)
+    end
+  end
   local floorParams = RaycastParams.new()
   floorParams.FilterType = Enum.RaycastFilterType.Exclude
-  floorParams.FilterDescendantsInstances = {spawner, infectionFolder}
+  floorParams.FilterDescendantsInstances = floorIgnore
   floorParams.IgnoreWater = true
 
   local startPosition = infectionBulb.Position
@@ -3464,13 +3420,18 @@ local function formStageFiveNest()
   eggPointsFolder.Parent = workspace
 
   local rootTips = {}
+  local supportCount = 0
   for index = 1, 4 do
     local angle = (index - 1) * math.pi * 0.5 + math.pi * 0.25
     local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
     local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
       + Vector3.new(0, 3, 0)
-    local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -100, 0), floorParams)
+    local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -120, 0), floorParams)
+    if not actualFloor or actualFloor.Normal.Y <= 0.82 then
+      actualFloor = floorHit
+    end
     if actualFloor and actualFloor.Normal.Y > 0.82 then
+      supportCount += 1
       local base = actualFloor.Position + actualFloor.Normal * 0.08
       local insideBulb = infectionBulb.Position
         - Vector3.new(0, bulbRadius * 0.68, 0) + radial * (bulbRadius * 0.18)
@@ -3510,7 +3471,10 @@ local function formStageFiveNest()
           if segmentIndex == 4 then drift = Vector3.new(0, 0, -0.3) end
           local target = base + direction * (distance * alpha) + drift
           local probe = Vector3.new(target.X, previous.Y + 4, target.Z)
-          local ground = workspace:Raycast(probe, Vector3.new(0, -30, 0), floorParams)
+          local ground = workspace:Raycast(probe, Vector3.new(0, -60, 0), floorParams)
+          if not ground or ground.Normal.Y <= 0.82 then
+            ground = floorHit
+          end
 
           if ground and ground.Normal.Y > 0.82 then
             local nextPoint = ground.Position + ground.Normal * 0.1
@@ -3543,6 +3507,12 @@ local function formStageFiveNest()
       end
     end
     task.wait(0.3)
+  end
+
+  if supportCount < 4 then
+    warn("[INFECTION] Stage 5 created " .. supportCount .. " of 4 root supports.")
+  else
+    print("[INFECTION] Stage 5: all four root supports and ground runners were created.")
   end
 
   -- Allow the supports and floor runners to finish extending before the
