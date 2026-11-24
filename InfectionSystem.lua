@@ -38,7 +38,7 @@ local HANGING_CHANCE = 0.80
 local HANGING_MIN_LENGTH = 18
 local HANGING_MAX_LENGTH = 32
 
-local MAX_GROUND_STALKS = 3
+local MAX_GROUND_STALKS = 5
 local MAX_GROUND_ANCHORS = 60
 local GROUND_STALK_TRIGGER_DISTANCE = 14
 local GROUND_STALK_MIN_SPACING = 12
@@ -48,6 +48,9 @@ local GROUND_STALK_SEGMENTS = 5
 local GROUND_STALK_SCAN_INTERVAL = 0.35
 local GROUND_STALK_SPAWN_COOLDOWN = 6.5
 local GROUND_STALK_GRAB_COOLDOWN = 12.0
+local stageThreeStartedAt = nil
+local GROUND_STALK_DESPAWN_DISTANCE = 24
+local GROUND_STALK_DESPAWN_CHANCE = 0.45
 
 local MAIN_COLOR = Color3.fromRGB(75, 39, 31)
 local LIGHT_COLOR = Color3.fromRGB(112, 58, 39)
@@ -491,8 +494,22 @@ local function setRoundedStalkSegment(
 	)
 end
 
-local function createGroundStalk(anchor)
-	if #groundStalks >= MAX_GROUND_STALKS
+local function getGroundStalkLimit()
+	if growthStage == 5 then
+		return 5
+	elseif growthStage == 3 and stageThreeStartedAt then
+		local elapsed = os.clock() - stageThreeStartedAt
+		if elapsed >= 145 then return 4 end
+		if elapsed >= 95 then return 3 end
+		if elapsed >= 45 then return 2 end
+		return 1
+	end
+	return 0
+end
+
+local function createGroundStalk(anchor, targetRoot)
+	local stalkLimit = getGroundStalkLimit()
+	if #groundStalks >= stalkLimit
 		or generatedCount + GROUND_STALK_SEGMENTS > MAX_SEGMENTS then
 		return false
 	end
@@ -505,12 +522,62 @@ local function createGroundStalk(anchor)
 		end
 	end
 
+	local direction = Vector3.new(0, 0, 1)
+	if targetRoot and targetRoot.Parent then
+		local offset = targetRoot.Position - anchor.position
+		local horizontal = Vector3.new(offset.X, 0, offset.Z)
+		if horizontal.Magnitude > 0.05 then
+			direction = horizontal.Unit
+		end
+	end
+
+	-- A few low crawling runners extend toward the player first. The upright
+	-- stalk then rises from their tip, making the attack feel connected to
+	-- the existing ground network rather than appearing at the player's feet.
+	local crawlDistance = rng:NextNumber(3.5, 5.5)
+	local stalkPosition = anchor.position + direction * crawlDistance
 	local model = Instance.new("Model")
 	model.Name = "PlayerFacingGroundVine"
 	model.Parent = infectionFolder
 
-	local parts = {}
+	local crawlerParts = {}
+	for index = 1, 4 do
+		local part = Instance.new("Part")
+		part.Name = "CrawlingRunner"
+		part.Shape = Enum.PartType.Cylinder
+		part.Material = Enum.Material.CorrodedMetal
+		part.Color = getRandomColor()
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = false
+		part.Transparency = 1
+		part.Size = Vector3.new(0.05, 0.22, 0.22)
+		part.Parent = model
+		table.insert(crawlerParts, part)
 
+		local alphaStart = (index - 1) / 4
+		local alphaEnd = index / 4
+		task.spawn(function()
+			task.wait((index - 1) * 0.16)
+			local began = os.clock()
+			while part.Parent and os.clock() - began < 0.48 do
+				local alpha = math.clamp((os.clock() - began) / 0.48, 0, 1)
+				local a = anchor.position:Lerp(stalkPosition, alphaStart)
+				local b = anchor.position:Lerp(stalkPosition, alphaStart + (alphaEnd - alphaStart) * alpha)
+				setRoundedStalkSegment(
+					part,
+					a + Vector3.new(0, 0.08, 0),
+					b + Vector3.new(0, 0.08, 0),
+					direction,
+					0.11
+				)
+				task.wait(0.04)
+			end
+		end)
+	end
+
+	local parts = {}
 	for index = 1, GROUND_STALK_SEGMENTS do
 		local part = Instance.new("Part")
 		part.Name = "VineStem"
@@ -531,12 +598,17 @@ local function createGroundStalk(anchor)
 	anchor.used = true
 
 	table.insert(groundStalks, {
-		anchor = anchor.position,
+		anchor = stalkPosition,
+		origin = anchor.position,
+		anchorData = anchor,
 		model = model,
 		parts = parts,
-		age = 0,
-		direction = Vector3.new(0, 0, 1),
-		lastTargetDirection = Vector3.new(0, 0, 1)
+		crawlerParts = crawlerParts,
+		age = -1.8,
+		direction = direction,
+		lastTargetDirection = direction,
+		awayTime = 0,
+		nextDespawnCheck = os.clock() + rng:NextNumber(8, 15)
 	})
 
 	return true
@@ -630,8 +702,37 @@ local function runGroundStalkSystem()
 		previousTime = now
 		scanClock += deltaTime
 
-		for _, stalk in ipairs(groundStalks) do
+		for stalkIndex = #groundStalks, 1, -1 do
+			local stalk = groundStalks[stalkIndex]
 			updateGroundStalk(stalk, deltaTime)
+
+			local nearestRoot, nearestDistance = findNearestPlayer(
+				stalk.anchor,
+				GROUND_STALK_DESPAWN_DISTANCE
+			)
+			if nearestRoot then
+				stalk.awayTime = 0
+			elseif not stalk.grabbed and now >= stalk.nextDespawnCheck then
+				stalk.awayTime += deltaTime
+				if stalk.awayTime >= 4 then
+					if rng:NextNumber() < GROUND_STALK_DESPAWN_CHANCE then
+						for _, part in ipairs(stalk.model:GetDescendants()) do
+							if part:IsA("BasePart") then
+								TweenService:Create(part, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Transparency = 1}):Play()
+							end
+						end
+						task.delay(1.2, function()
+							if stalk.model and stalk.model.Parent then stalk.model:Destroy() end
+						end)
+						generatedCount = math.max(0, generatedCount - GROUND_STALK_SEGMENTS)
+						if stalk.anchorData then stalk.anchorData.used = false end
+						table.remove(groundStalks, stalkIndex)
+						continue
+					end
+					stalk.nextDespawnCheck = now + rng:NextNumber(10, 18)
+					stalk.awayTime = 0
+				end
+			end
 
 			local stalkReady =
 				stalk.age >= GROWTH_DELAY * GROUND_STALK_SEGMENTS
@@ -692,7 +793,7 @@ local function runGroundStalkSystem()
 			-- Keep the seed and developing bulb phases visually quiet.
 			if growthStage >= 3
 				and now - lastGroundStalkSpawn >= GROUND_STALK_SPAWN_COOLDOWN
-				and #groundStalks < MAX_GROUND_STALKS then
+				and #groundStalks < getGroundStalkLimit() then
 
 				for _, anchor in ipairs(groundAnchors) do
 					if not anchor.used then
@@ -702,7 +803,7 @@ local function runGroundStalkSystem()
 						)
 
 						if root then
-							if createGroundStalk(anchor) then
+							if createGroundStalk(anchor, root) then
 								lastGroundStalkSpawn = now
 							end
 							break
@@ -3299,6 +3400,7 @@ local function runInfectionStageController()
 		elseif growthStage == 2 and elapsed >= 115 and count >= 35 then
 			growthStage = 3
 			stageClock = os.clock()
+			stageThreeStartedAt = stageClock
 			setBulbSize(3.8, 18)
 			print("[INFECTION] Stage 3: mature parasite growth. Original growth settings restored.")
 			local origin = infectionBulb.Position - Vector3.new(0, 1.5, 0)
