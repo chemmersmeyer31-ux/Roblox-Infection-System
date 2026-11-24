@@ -319,6 +319,9 @@ local function makeCrawler(startPosition, startNormal)
             and workspace:GetAttribute("StageFourRelocating") == true
             and escortBulb and escortBulb:IsA("BasePart")
         local escortSlot = model:GetAttribute("EscortSlot")
+        if state == "escort" and not escortActive then
+            setState("roam", rng:NextNumber(2, 4))
+        end
 
         -- Escorts resume formation whenever they are not responding to a visible player.
         if escortActive and not visibleTarget and state ~= "leap"
@@ -573,12 +576,28 @@ while script.Parent do
     local cap = MAX_CRAWLERS[current]
 
     if current == 4 and workspace:GetAttribute("StageFourRelocating") == true then
-        local assigned = 0
+        local reference = workspace:FindFirstChild("InfectionBulbReference")
+        local bulb = reference and reference:IsA("ObjectValue") and reference.Value
+        local escorts = {}
+
         for _, child in ipairs(folder:GetChildren()) do
-            if child:IsA("Model") and child.Name == "LegsOnlyCrawler" and assigned < 2 then
-                assigned += 1
-                child:SetAttribute("EscortSlot", assigned)
+            if child:IsA("Model") and child.Name == "LegsOnlyCrawler" then
+                table.insert(escorts, child)
             end
+        end
+
+        -- Ensure Stage 4 has two escorts immediately, even if the original
+        -- Stage 3 crawlers expired just before relocation began.
+        while #escorts < 2 and bulb and bulb:IsA("BasePart") do
+            local side = #escorts == 0 and -1 or 1
+            local spawnAt = bulb.Position + Vector3.new(side * 4, 0, 2)
+            local groundPosition, groundNormal = findGround(spawnAt)
+            local escort = makeCrawler(groundPosition, groundNormal)
+            table.insert(escorts, escort)
+        end
+
+        for index = 1, math.min(#escorts, 2) do
+            escorts[index]:SetAttribute("EscortSlot", index)
         end
     end
 
