@@ -710,18 +710,29 @@ while script.Parent do
     end
 
     if not egg then
-      local angle = rng:NextNumber(0, math.pi * 2)
-      local radius = rng:NextNumber(2, 4.5)
-      local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
       local spawnOrigin = infectionSpawner.Position
+      local offset = Vector3.zero
+
       if current == 5 then
         local pointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
         local points = pointsFolder and pointsFolder:GetChildren() or {}
         local point = #points > 0 and points[rng:NextInteger(1, #points)] or nil
+
         if point and point:IsA("BasePart") then
+          -- Stage 5 eggs use the exact positions of the ground-vine markers.
+          -- Do not add a random offset that would scatter them beside the infection.
           spawnOrigin = point.Position
+        else
+          local angle = rng:NextNumber(0, math.pi * 2)
+          local radius = rng:NextNumber(2, 4.5)
+          offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         end
+      else
+        local angle = rng:NextNumber(0, math.pi * 2)
+        local radius = rng:NextNumber(2, 4.5)
+        offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
       end
+
       local hatchPosition, hatchNormal = findGround(spawnOrigin + offset)
       egg = createEgg(hatchPosition, hatchNormal)
     end
