@@ -41,6 +41,12 @@ local spawner = workspace:WaitForChild(SPAWNER_NAME)
 
 assert(spawner:IsA("BasePart"), SPAWNER_NAME .. " must be a Part or other BasePart")
 
+spawner.Anchored = true
+spawner.Transparency = 1
+spawner.CanCollide = false
+spawner.CanTouch = false
+spawner.CanQuery = false
+
 local oldFolder = workspace:FindFirstChild("ParasiteArmPrototype")
 if oldFolder then
   oldFolder:Destroy()
