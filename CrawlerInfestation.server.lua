@@ -596,17 +596,20 @@ local function makeCrawler(startPosition, startNormal)
     return model
 end
 
-local function hatchBulb(position, surfaceNormal)
+local function createEgg(position, surfaceNormal)
     local normal = surfaceNormal and surfaceNormal.Unit or Vector3.yAxis
     local egg = makePart(folder, "CrawlerEgg", Enum.PartType.Ball,
         Vector3.new(0.3, 0.43, 0.3), Color3.fromRGB(248, 207, 64))
     egg.Material = Enum.Material.SmoothPlastic
-    -- findGround returns a crawler-center offset; lower the egg so it rests
-    -- close to the actual surface instead of appearing to float.
-    local eggPosition = position - normal * 0.1
-    egg.CFrame = CFrame.lookAt(eggPosition, eggPosition + normal)
+    egg.Position = position - normal * 0.1
+    egg.CFrame = CFrame.lookAt(egg.Position, egg.Position + normal)
+    egg:SetAttribute("EggReadyToHatch", false)
+    return egg
+end
 
-    -- A clearly visible little yellow egg sits and pulses before hatching.
+local function hatchEgg(egg)
+    if not egg or not egg.Parent then return end
+    local normal = egg.CFrame.UpVector
     local baseSize = egg.Size
     local start = os.clock()
     local hatchDuration = 3.6
@@ -619,7 +622,6 @@ local function hatchBulb(position, surfaceNormal)
 
     if egg.Parent then
         local spawnPosition = egg.Position + normal * 0.3
-        -- Shrink the shell away so the crawler visibly emerges from its egg.
         for step = 1, 8 do
             if not egg.Parent then break end
             egg.Size = baseSize * (1 - step / 9)
@@ -631,10 +633,42 @@ local function hatchBulb(position, surfaceNormal)
     end
 end
 
+local function countCrawlers()
+    local count = 0
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("Model") and child.Name == "LegsOnlyCrawler" then
+            count += 1
+        end
+    end
+    return count
+end
+
+local function ensureStageTwoEggs()
+    local eggs = {}
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("BasePart") and child.Name == "CrawlerEgg" then
+            table.insert(eggs, child)
+        end
+    end
+    local desiredEggs = 4
+    for index = #eggs + 1, desiredEggs do
+        local angle = (index - 1) * (math.pi * 2 / desiredEggs)
+        local radius = 2.7 + (index % 2) * 0.8
+        local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+        local position, normal = findGround(infectionSpawner.Position + offset)
+        createEgg(position, normal)
+    end
+end
+
 local lastHatch = 0
 while script.Parent do
     local current = currentStage()
     local cap = MAX_CRAWLERS[current]
+
+    if current == 2 then
+        -- Stage 2 is the egg incubation stage: show the eggs, but do not hatch.
+        ensureStageTwoEggs()
+    end
 
     if current == 4 and workspace:GetAttribute("StageFourRelocating") == true then
         local reference = workspace:FindFirstChild("InfectionBulbReference")
@@ -647,8 +681,6 @@ while script.Parent do
             end
         end
 
-        -- Ensure Stage 4 has two escorts immediately, even if the original
-        -- Stage 3 crawlers expired just before relocation began.
         while #escorts < 2 and bulb and bulb:IsA("BasePart") do
             local side = #escorts == 0 and -1 or 1
             local spawnAt = bulb.Position + Vector3.new(side * 4, 0, 2)
@@ -662,25 +694,41 @@ while script.Parent do
         end
     end
 
-    if cap and #folder:GetChildren() < cap
+    if cap and countCrawlers() < cap
         and os.clock() - lastHatch >= HATCH_INTERVAL[current] then
 
         lastHatch = os.clock()
-        local angle = rng:NextNumber(0, math.pi * 2)
-        local radius = rng:NextNumber(2, 4.5)
-        local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
-        local spawnOrigin = infectionSpawner.Position
-        if current == 5 then
-            local pointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
-            local points = pointsFolder and pointsFolder:GetChildren() or {}
-            local point = #points > 0 and points[rng:NextInteger(1, #points)] or nil
-            if point and point:IsA("BasePart") then
-                spawnOrigin = point.Position
+        local egg
+        if current == 3 then
+            -- Use the eggs that were already visible throughout Stage 2 first.
+            for _, child in ipairs(folder:GetChildren()) do
+                if child:IsA("BasePart") and child.Name == "CrawlerEgg" then
+                    egg = child
+                    break
+                end
             end
         end
-        local hatchPosition, hatchNormal = findGround(spawnOrigin + offset)
-        task.spawn(hatchBulb, hatchPosition, hatchNormal)
+
+        if not egg then
+            local angle = rng:NextNumber(0, math.pi * 2)
+            local radius = rng:NextNumber(2, 4.5)
+            local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+            local spawnOrigin = infectionSpawner.Position
+            if current == 5 then
+                local pointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
+                local points = pointsFolder and pointsFolder:GetChildren() or {}
+                local point = #points > 0 and points[rng:NextInteger(1, #points)] or nil
+                if point and point:IsA("BasePart") then
+                    spawnOrigin = point.Position
+                end
+            end
+            local hatchPosition, hatchNormal = findGround(spawnOrigin + offset)
+            egg = createEgg(hatchPosition, hatchNormal)
+        end
+
+        task.spawn(hatchEgg, egg)
     end
 
+    task.wait(2)
     task.wait(2)
 end
