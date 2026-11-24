@@ -2193,7 +2193,7 @@ local function prepareInfectedCharacter()
 	return clone
 end
 
-local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, targetCFrame)
+local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, targetCFrame, keepAnchored)
 	if not player or not player.Parent then
 		return false
 	end
@@ -2209,9 +2209,10 @@ local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, t
 	infectedCharacter:PivotTo(targetCFrame)
 	infectedCharacter.Parent = workspace
 
+	-- Keep the replacement physically fixed inside the cocoon until its release.
 	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
 		if descendant:IsA("BasePart") then
-			descendant.Anchored = false
+			descendant.Anchored = keepAnchored == true
 		end
 	end
 
@@ -2225,9 +2226,11 @@ local function replacePlayerCharacter(player, oldCharacter, infectedCharacter, t
 		return false
 	end
 
-	pcall(function()
-		infectedRoot:SetNetworkOwner(player)
-	end)
+	if not keepAnchored then
+		pcall(function()
+			infectedRoot:SetNetworkOwner(player)
+		end)
+	end
 
 	if oldCharacter and oldCharacter.Parent then
 		oldCharacter:Destroy()
@@ -2357,69 +2360,14 @@ local function performInfectedDescent(
 )
 	print("[INFECTION] Cocoon holding captured player.")
 
-	-- Prepare and validate the replacement before hiding the player's avatar.
-	-- If the model is missing or incorrectly rigged, the original character is restored.
+	-- Prepare the replacement before changing anything about the original avatar.
 	local infectedCharacter = prepareInfectedCharacter()
 	if not infectedCharacter then
 		restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
 		return false
 	end
 
-	-- Keep the cocoon closed for a few seconds.
-	local hangStart = os.clock()
-
-	while os.clock() - hangStart < POST_HOIST_HANG_TIME do
-		if not character.Parent or not root.Parent then
-			infectedCharacter:Destroy()
-			if character.Parent then
-				restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
-			end
-			return false
-		end
-
-		updateCocoonEntanglement(finalEntanglement, root, 1)
-		updateOuterVineLayer(outerLayer, root, 1)
-
-		if hoistVines then
-			updateHoistVines(hoistVines, root, 1)
-		end
-
-		task.wait(0.05)
-	end
-
-	if not character.Parent or not root.Parent then
-		infectedCharacter:Destroy()
-		if character.Parent then
-			restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
-		end
-		return false
-	end
-
-	print("[INFECTION] Cocoon beginning to retract.")
-
-	-- Retract the cocoon around the player.
-	retractCocoonLayer(outerLayer)
-	retractCocoonLayer(finalEntanglement)
-
-	-- Remove the previous ceiling attachment vines.
-	destroyHoistVines(hoistVines)
-
-	if not character.Parent or not root.Parent then
-		infectedCharacter:Destroy()
-		if character.Parent then
-			restoreOriginalCharacter(character, humanoid, root, nil, restoreState)
-		end
-		return false
-	end
-
-	-- Create the invisible placeholder at the captured player's position.
-	local placeholder = createInvisiblePlaceholder(root)
-
-	-- Hide the original avatar so the placeholder becomes the
-	-- reference for the future infected character model.
 	local savedVisuals = hideOriginalCharacter(character)
-
-	-- Keep the real player safely anchored and hidden.
 	root.Anchored = true
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
@@ -2428,70 +2376,78 @@ local function performInfectedDescent(
 	humanoid.JumpPower = 0
 	humanoid.JumpHeight = 0
 	humanoid.AutoRotate = false
-	humanoid.DisplayDistanceType =
-		Enum.HumanoidDisplayDistanceType.None
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 
-	-- The descent vines use the actual roof location when available.
-	-- If no roof was found, they begin above the player instead.
-	local anchorPosition
+	-- Swap characters WHILE the cocoon is still closed and suspended.
+	-- The infected rig remains anchored at the roof position during the reveal.
+	local transformed = replacePlayerCharacter(
+		player,
+		character,
+		infectedCharacter,
+		root.CFrame,
+		true
+	)
 
-	if roofResult then
-		anchorPosition = roofResult.Position
-	else
-		anchorPosition =
-			root.Position + Vector3.new(0, 10, 0)
+	if not transformed then
+		restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
+		return false
 	end
 
-	local descentVines = createDescentVines()
+	local infectedRoot = infectedCharacter:FindFirstChild("HumanoidRootPart")
+	local infectedHumanoid = infectedCharacter:FindFirstChildOfClass("Humanoid")
+	if not infectedRoot or not infectedHumanoid then
+		warn("[INFECTION] Replacement rig lost its root or Humanoid after assignment.")
+		return false
+	end
 
-	print("[INFECTION] New descent vines forming.")
+	infectedHumanoid.WalkSpeed = 0
+	infectedHumanoid.JumpPower = 0
+	infectedHumanoid.JumpHeight = 0
+	infectedHumanoid.AutoRotate = false
 
-	-- Grow the new vines around the placeholder.
-	local vineStart = os.clock()
+	print("[INFECTION] Player transformed inside the suspended cocoon.")
 
-	while os.clock() - vineStart < 1.5 do
-		if not placeholder.Parent then
-			destroyDescentVines(descentVines)
-			infectedCharacter:Destroy()
-			if character.Parent then
-				restoreOriginalCharacter(character, humanoid, root, savedVisuals, restoreState)
-			end
+	-- Keep the ceiling/grabbing vines attached while the new parasite is revealed.
+	local hangStart = os.clock()
+	while os.clock() - hangStart < POST_HOIST_HANG_TIME do
+		if not infectedCharacter.Parent or not infectedRoot.Parent then
 			return false
 		end
 
-		local alpha = math.clamp(
-			(os.clock() - vineStart) / 1.5,
-			0,
-			1
-		)
-
-		updateDescentVines(
-			descentVines,
-			placeholder,
-			anchorPosition,
-			alpha
-		)
-
-		task.wait(0.035)
+		updateCocoonEntanglement(finalEntanglement, infectedRoot, 1)
+		updateOuterVineLayer(outerLayer, infectedRoot, 1)
+		if hoistVines then
+			updateHoistVines(hoistVines, infectedRoot, 1)
+		end
+		task.wait(0.05)
 	end
 
-	-- Slowly lower the placeholder.
-	local startPosition = placeholder.Position
-	local endPosition =
-		startPosition - Vector3.new(
-			0,
-			INFECTED_DESCENT_DISTANCE,
-			0
-		)
+	if not infectedCharacter.Parent or not infectedRoot.Parent then
+		return false
+	end
 
-	print("[INFECTION] Lowering invisible infected placeholder.")
+	print("[INFECTION] Cocoon opening around the infected character.")
 
+	-- Retract the cocoon while the support vines are STILL holding it at the roof.
+	retractCocoonLayer(outerLayer)
+	retractCocoonLayer(finalEntanglement)
+
+	-- One final update keeps the support vines aligned with the new character.
+	if hoistVines and infectedRoot.Parent then
+		updateHoistVines(hoistVines, infectedRoot, 1)
+	end
+
+	-- Only release the ceiling support once the cocoon has opened.
+	destroyHoistVines(hoistVines)
+	print("[INFECTION] Ceiling vines released. Lowering the visible infected character.")
+
+	-- Move the actual infected rig down; there is no invisible placeholder/pop-in.
+	local startPivot = infectedCharacter:GetPivot()
 	local descentStart = os.clock()
 
 	while os.clock() - descentStart < INFECTED_DESCENT_TIME do
-		if not placeholder.Parent then
-			destroyDescentVines(descentVines)
-			return
+		if not infectedCharacter.Parent or not infectedRoot.Parent then
+			return false
 		end
 
 		local alpha = math.clamp(
@@ -2499,65 +2455,43 @@ local function performInfectedDescent(
 			0,
 			1
 		)
-
 		local easedAlpha = alpha * alpha * (3 - 2 * alpha)
-		local currentPosition =
-			startPosition:Lerp(endPosition, easedAlpha)
-
-		placeholder.CFrame =
-			CFrame.new(currentPosition) * root.CFrame.Rotation
-
-		updateDescentVines(
-			descentVines,
-			placeholder,
-			anchorPosition,
-			1
+		local offset = Vector3.new(
+			0,
+			-INFECTED_DESCENT_DISTANCE * easedAlpha,
+			0
 		)
 
+		infectedCharacter:PivotTo(startPivot + offset)
 		task.wait(0.035)
 	end
 
-	placeholder.Position = endPosition
-
-	updateDescentVines(
-		descentVines,
-		placeholder,
-		anchorPosition,
-		1
+	infectedCharacter:PivotTo(
+		startPivot - Vector3.new(0, INFECTED_DESCENT_DISTANCE, 0)
 	)
 
-	print("[INFECTION] Placeholder descent complete.")
-
-	-- Swap the hidden avatar for the prepared infected rig at the placeholder's
-	-- final position. The model is parented before assigning Player.Character.
-	local transformed = replacePlayerCharacter(
-		player,
-		character,
-		infectedCharacter,
-		placeholder.CFrame
-	)
-
-	if not transformed then
-		warn("[INFECTION] Transformation failed. Restoring the original character.")
-		if infectedCharacter and infectedCharacter.Parent then
-			infectedCharacter:Destroy()
+	-- The parasite is now released and can move normally.
+	for _, descendant in ipairs(infectedCharacter:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored = false
 		end
-		restoreOriginalCharacter(
-			character,
-			humanoid,
-			root,
-			savedVisuals,
-			restoreState
-		)
-		placeholder:Destroy()
-		destroyDescentVines(descentVines)
-		return false
 	end
 
-	placeholder:Destroy()
-	destroyDescentVines(descentVines)
+	infectedHumanoid.WalkSpeed = restoreState.WalkSpeed
+	infectedHumanoid.AutoRotate = restoreState.AutoRotate
+	infectedHumanoid.UseJumpPower = restoreState.UseJumpPower
+	infectedHumanoid.JumpPower = restoreState.JumpPower
+	infectedHumanoid.JumpHeight = restoreState.JumpHeight
+	infectedHumanoid:SetStateEnabled(
+		Enum.HumanoidStateType.Jumping,
+		restoreState.JumpingEnabled
+	)
 
-	print("[INFECTION] Player successfully transformed into InfectedCharacter.")
+	pcall(function()
+		infectedRoot:SetNetworkOwner(player)
+	end)
+
+	print("[INFECTION] Infected character released successfully.")
 	return true
 end
 
