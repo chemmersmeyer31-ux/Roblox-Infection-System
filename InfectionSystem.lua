@@ -3251,7 +3251,7 @@ end
 
 local function formStageFiveNest()
   if not infectionBulb or not infectionBulb.Parent then return end
-  print("[INFECTION] Stage 5: the creature is extending its nest anchors.")
+  print("[INFECTION] Stage 5: the creature is extending its nest anchors and four ground supports.")
 
   -- Keep publishing the live core position after Stage 4 relocation ends.
   local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
@@ -3273,13 +3273,14 @@ local function formStageFiveNest()
   floorParams.FilterType = Enum.RaycastFilterType.Exclude
   floorParams.FilterDescendantsInstances = floorIgnore
   floorParams.IgnoreWater = true
+  floorParams.RespectCanCollide = true
 
   local startPosition = infectionBulb.Position
   local startSize = infectionBulb.Size
   local bulbRadius = math.max(startSize.Y * 0.5, 1)
   local floorHit = workspace:Raycast(
     startPosition + Vector3.new(0, 4, 0),
-    Vector3.new(0, -60, 0),
+    Vector3.new(0, -180, 0),
     floorParams
   )
   local groundPosition = floorHit
@@ -3413,8 +3414,8 @@ local function formStageFiveNest()
     local angle = (index - 1) * math.pi * 0.5 + math.pi * 0.25
     local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
     local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
-      + Vector3.new(0, 3, 0)
-    local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -120, 0), floorParams)
+      + Vector3.new(0, 8, 0)
+    local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -240, 0), floorParams)
     local floorPosition
     local floorNormal
     if actualFloor and actualFloor.Normal.Y > 0.82 then
@@ -3423,6 +3424,18 @@ local function formStageFiveNest()
     elseif floorHit and floorHit.Normal.Y > 0.82 then
       floorPosition = Vector3.new(floorOrigin.X, floorHit.Position.Y, floorOrigin.Z)
       floorNormal = floorHit.Normal
+    else
+      -- Last-resort probe directly beneath each support, with a wider
+      -- vertical search so elevated cores still find the map floor.
+      local deepFloor = workspace:Raycast(
+        floorOrigin + Vector3.new(0, 30, 0),
+        Vector3.new(0, -500, 0),
+        floorParams
+      )
+      if deepFloor and deepFloor.Normal.Y > 0.82 then
+        floorPosition = deepFloor.Position
+        floorNormal = deepFloor.Normal
+      end
     end
     if floorPosition and floorNormal then
       supportCount += 1
@@ -3506,9 +3519,9 @@ local function formStageFiveNest()
   end
 
   if supportCount < 4 then
-    warn("[INFECTION] Stage 5 created " .. supportCount .. " of 4 root supports.")
+    warn("[INFECTION] Stage 5 created " .. supportCount .. " of 4 ground supports. Check the floor raycasts above.")
   else
-    print("[INFECTION] Stage 5: all four root supports and ground runners were created.")
+    print("[INFECTION] Stage 5: all four ground supports and their ground runners were created.")
   end
 
   -- Allow the supports and floor runners to finish extending before the
