@@ -182,6 +182,21 @@ local function steerOnSurface(position, normal, desiredDirection, distance, igno
     desired = desired + Vector3.yAxis * 0.8
   end
   local direction = tangentDirection(desired, normal)
+
+  -- Step onto stair treads instead of treating each riser as an unclimbable wall.
+  if normal.Y > 0.65 then
+    local stepAhead = position + direction * 1.45
+    local stepHit = raycast(stepAhead + Vector3.yAxis * 1.65,
+      -Vector3.yAxis * 2.6, ignoreCharacter)
+    if stepHit and stepHit.Normal.Y > 0.55 then
+      local heightChange = stepHit.Position.Y - position.Y
+      if heightChange > -0.45 and heightChange < 1.35 then
+        return stepHit.Position + stepHit.Normal * 0.3,
+          stepHit.Normal.Unit, tangentDirection(direction, stepHit.Normal)
+      end
+    end
+  end
+
   local probeOrigin = position + normal * 0.42
   local obstacle = raycast(probeOrigin, direction * 1.65, ignoreCharacter)
 
@@ -580,6 +595,7 @@ local function makeCrawler(startPosition, startNormal)
 
     local moving = state == "roam" or state == "investigate"
       or state == "stalk" or state == "approach" or state == "retreat"
+      or state == "escort"
     local gaitSpeed = moving and 9 or 5
     for i, leg in ipairs(legs) do
       local angle = leg.angle
@@ -668,9 +684,21 @@ local function ensureStageTwoEggs()
 end
 
 local lastHatch = 0
+local previousStage = currentStage()
 while script.Parent do
   local current = currentStage()
   local cap = MAX_CRAWLERS[current]
+
+  if current == 5 and previousStage < 5 then
+    -- Remove any dormant Stage 2 eggs left near the original seed location.
+    -- Stage 5 eggs will be regenerated along the relocated core's ground vines.
+    for _, child in ipairs(folder:GetChildren()) do
+      if child:IsA("BasePart") and child.Name == "CrawlerEgg" then
+        child:Destroy()
+      end
+    end
+  end
+  previousStage = current
 
   if current == 2 then
     -- Stage 2 is the egg incubation stage: show the eggs, but do not hatch.
@@ -726,12 +754,18 @@ while script.Parent do
         local point = #points > 0 and points[rng:NextInteger(1, #points)] or nil
 
         if point and point:IsA("BasePart") then
-          -- Stage 5 eggs use the exact positions of the ground-vine markers.
-          -- Do not add a random offset that would scatter them beside the infection.
+          -- Stage 5 eggs hatch directly along the relocated core's ground runners.
           spawnOrigin = point.Position
         else
+          -- The ground-vine markers may not exist yet while Stage 5 is forming.
+          -- Fall back to the live core, never the original InfectionSpawner.
+          local reference = workspace:FindFirstChild("InfectionBulbReference")
+          local bulb = reference and reference:IsA("ObjectValue") and reference.Value
+          if bulb and bulb:IsA("BasePart") then
+            spawnOrigin = bulb.Position
+          end
           local angle = rng:NextNumber(0, math.pi * 2)
-          local radius = rng:NextNumber(2, 4.5)
+          local radius = rng:NextNumber(2, 4)
           offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         end
       else
