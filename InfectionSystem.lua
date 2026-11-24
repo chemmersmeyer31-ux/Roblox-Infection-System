@@ -2342,18 +2342,6 @@ local function destroyDescentVines(vines)
 	end
 end
 
-local function destroyDescentVines(vines)
-	if not vines then return end
-
-	for _, vine in ipairs(vines) do
-		for _, part in ipairs(vine.parts) do
-			if part and part.Parent then
-				part:Destroy()
-			end
-		end
-	end
-end
-
 --------------------------------------------------
 -- INFECTED DESCENT SEQUENCE
 --------------------------------------------------
