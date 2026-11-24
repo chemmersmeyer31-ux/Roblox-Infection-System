@@ -23,7 +23,6 @@ local LEG_COUNT = 8
 local SEED = Color3.fromRGB(112, 57, 39)
 local DARK = Color3.fromRGB(70, 35, 29)
 local RIDGE = Color3.fromRGB(139, 75, 49)
-local EYE_YELLOW = Color3.fromRGB(255, 225, 35)
 
 local function part(name, shape, size, color, material)
     local p = Instance.new("Part")
@@ -73,15 +72,12 @@ for i = 1, LEG_COUNT do
         Vector3.new(0.21, 0.21, 0.21), RIDGE)
     local tip = part("LegTip" .. i, Enum.PartType.Cylinder,
         Vector3.new(1, 0.10, 0.10), DARK)
-    local eye = part("TinyEye" .. i, Enum.PartType.Ball,
-        Vector3.new(0.075, 0.075, 0.075), EYE_YELLOW, Enum.Material.Neon)
 
     legs[i] = {
         upper = upper,
         lower = lower,
         knee = knee,
         tip = tip,
-        eye = eye,
         angle = ((i - 1) / LEG_COUNT) * math.pi * 2,
         length = ({1.00, 1.08, 0.94, 1.12, 1.04, 0.96, 1.10, 0.98})[i],
     }
@@ -123,10 +119,6 @@ connection = RunService.Heartbeat:Connect(function()
         between(leg.lower, knee, foot, 0.17)
         between(leg.tip, foot, clawEnd, 0.10)
         leg.knee.Position = knee
-
-        -- Small yellow points sit close to the hub as subtle infection details;
-        -- they do not form a face or head.
-        leg.eye.Position = center + radial * 0.16 + Vector3.new(0, 0.055, 0)
     end
 end)
 
