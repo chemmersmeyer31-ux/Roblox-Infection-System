@@ -730,5 +730,4 @@ while script.Parent do
     end
 
     task.wait(2)
-    task.wait(2)
 end
