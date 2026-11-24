@@ -3467,17 +3467,8 @@ local function formStageFiveNest()
       )
       table.insert(rootTips, {position = base, direction = radial, support = support})
 
-      local eggPoint = Instance.new("Part")
-      eggPoint.Name = "EggPoint" .. index
-      eggPoint.Anchored = true
-      eggPoint.Transparency = 1
-      eggPoint.CanCollide = false
-      eggPoint.CanTouch = false
-      eggPoint.CanQuery = false
-      eggPoint.Size = Vector3.new(0.2, 0.2, 0.2)
-      eggPoint.Position = base
-      eggPoint.Parent = eggPointsFolder
-
+      -- Egg spawn markers are placed along the ground runners below,
+      -- not in a loose ring around the nest.
       -- Smaller veins visibly branch out of each thick support and feed
       -- back into the bulb instead of ending as isolated floating braces.
       for veinIndex = 1, 2 do
@@ -3509,8 +3500,24 @@ local function formStageFiveNest()
             growStageFiveVine(
               "Stage5GroundCrawlerVine", previous, nextPoint,
               math.max(0.13, 0.28 - segmentIndex * 0.025),
-             rng:NextNumber(0.65, 1.0)
+              rng:NextNumber(0.65, 1.0)
             )
+
+            -- Put eggs directly along the visible runner, like growths
+            -- attached to the infection instead of scattered nearby.
+            if segmentIndex == 2 or segmentIndex == 4 then
+              local eggPoint = Instance.new("Part")
+              eggPoint.Name = "EggPoint"
+              eggPoint.Anchored = true
+              eggPoint.Transparency = 1
+              eggPoint.CanCollide = false
+              eggPoint.CanTouch = false
+              eggPoint.CanQuery = false
+              eggPoint.Size = Vector3.new(0.2, 0.2, 0.2)
+              eggPoint.Position = previous:Lerp(nextPoint, 0.5)
+              eggPoint.Parent = eggPointsFolder
+            end
+
             previous = nextPoint
           end
         end
