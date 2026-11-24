@@ -71,6 +71,11 @@ local groundStalks = {}
 
 local activeGrabCount = 0
 local infectionGrowthBoosts = 0
+local GROWTH_BOOST_MULTIPLIER = 3
+local GROWTH_BOOST_DURATION = 30
+local GROWTH_BOOST_COOLDOWN = 12
+local growthBoostUntil = 0
+local lastGrowthBoostAt = -math.huge
 local lastGroundStalkSpawn = 0
 local infectedPlayers = {}
 
@@ -1380,13 +1385,15 @@ growBranch = function(position, normal, direction, steps, depth)
 		normal = nextNormal
 		direction = nextDirection
 
+		local activeSpeed = (os.clock() < growthBoostUntil) and GROWTH_BOOST_MULTIPLIER or 1
+		local branchChance = math.min(settings[4] * activeSpeed, 0.88)
+
 		if depth < settings[5]
-			and rng:NextNumber() < settings[4]
+			and rng:NextNumber() < branchChance
 			and generatedCount < MAX_SEGMENTS then
 
 			local branchAngle = math.rad(rng:NextNumber(40, 110))
 			local sign = rng:NextInteger(0, 1) == 0 and -1 or 1
-
 			local branchDirection =
 				CFrame.fromAxisAngle(normal, branchAngle * sign)
 				:VectorToWorldSpace(direction)
@@ -1396,16 +1403,13 @@ growBranch = function(position, normal, direction, steps, depth)
 					position,
 					normal,
 					branchDirection,
-					rng:NextInteger(
-						MIN_BRANCH_STEPS,
-						MAX_BRANCH_STEPS
-					),
+					rng:NextInteger(MIN_BRANCH_STEPS, MAX_BRANCH_STEPS),
 					depth + 1
 				)
 			end)
 		end
 
-		task.wait(settings[3] * rng:NextNumber(0.8, 1.3))
+		task.wait((settings[3] / activeSpeed) * rng:NextNumber(0.8, 1.3))
 	end
 end
 
@@ -3427,6 +3431,55 @@ local function runInfectionStageController()
 end
 
 --------------------------------------------------
+-- TOUCH-ACTIVATED GROWTH BOOST PART
+--------------------------------------------------
+
+local function pointInsideGrowthBoost(part, point)
+	local localPoint = part.CFrame:PointToObjectSpace(point)
+	local half = part.Size * 0.5
+	return math.abs(localPoint.X) <= half.X
+		and math.abs(localPoint.Y) <= half.Y
+		and math.abs(localPoint.Z) <= half.Z
+end
+
+local function runGrowthBoostPartWatcher()
+	local wasTouching = false
+	while infectionFolder.Parent do
+		local boostPart = workspace:FindFirstChild("InfectionGrowthBoost", true)
+		local touching = false
+
+		if boostPart and boostPart:IsA("BasePart") then
+			if infectionBulb and infectionBulb.Parent
+				and pointInsideGrowthBoost(boostPart, infectionBulb.Position) then
+				touching = true
+			end
+
+			if not touching then
+				for _, segment in ipairs(growthSegments) do
+					if segment and segment.Parent
+						and pointInsideGrowthBoost(boostPart, segment.Position) then
+						touching = true
+						break
+					end
+				end
+			end
+		end
+
+		if touching and not wasTouching then
+			local now = os.clock()
+			if now - lastGrowthBoostAt >= GROWTH_BOOST_COOLDOWN then
+				lastGrowthBoostAt = now
+				growthBoostUntil = now + GROWTH_BOOST_DURATION
+				print("[INFECTION] Growth accelerator touched! Growth speed tripled for 30 seconds.")
+			end
+		end
+
+		wasTouching = touching
+		task.wait(0.35)
+	end
+end
+
+--------------------------------------------------
 -- START INFECTION
 --------------------------------------------------
 
@@ -3491,6 +3544,7 @@ end)
 
 -- Start progression and the player-reactive systems.
 task.spawn(runInfectionStageController)
+task.spawn(runGrowthBoostPartWatcher)
 task.spawn(runGroundStalkSystem)
 task.spawn(runCeilingVineSystem)
 
