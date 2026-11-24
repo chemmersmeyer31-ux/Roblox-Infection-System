@@ -601,8 +601,10 @@ local function hatchBulb(position, surfaceNormal)
     local egg = makePart(folder, "CrawlerEgg", Enum.PartType.Ball,
         Vector3.new(0.3, 0.43, 0.3), Color3.fromRGB(248, 207, 64))
     egg.Material = Enum.Material.SmoothPlastic
-    egg.CFrame = CFrame.lookAt(position + normal * 0.16,
-        position + normal * 1.16)
+    -- findGround returns a crawler-center offset; lower the egg so it rests
+    -- close to the actual surface instead of appearing to float.
+    local eggPosition = position - normal * 0.1
+    egg.CFrame = CFrame.lookAt(eggPosition, eggPosition + normal)
 
     -- A clearly visible little yellow egg sits and pulses before hatching.
     local baseSize = egg.Size
@@ -616,7 +618,7 @@ local function hatchBulb(position, surfaceNormal)
     end
 
     if egg.Parent then
-        local spawnPosition = egg.Position + normal * 0.42
+        local spawnPosition = egg.Position + normal * 0.3
         -- Shrink the shell away so the crawler visibly emerges from its egg.
         for step = 1, 8 do
             if not egg.Parent then break end
