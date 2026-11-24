@@ -287,6 +287,8 @@ local function makeCrawler(startPosition, startNormal)
   local forward = tangentDirection(Vector3.xAxis, normal)
 
   local born = os.clock()
+  local observedStage = currentStage()
+  local targetSuppressedUntil = 0
   local state = "roam"
   local stateUntil = 0
   local nextDecision = born + rng:NextNumber(1.5, 3.5)
@@ -317,6 +319,10 @@ local function makeCrawler(startPosition, startNormal)
       targetInfo = nil
       lastKnownPosition = nil
       lastSeenAt = 0
+    end
+
+    if os.clock() < targetSuppressedUntil then
+      return nil
     end
 
     local visible = nearestVisiblePlayer(position)
@@ -358,7 +364,24 @@ local function makeCrawler(startPosition, startNormal)
       return
     end
 
-    local visibleTarget = updateTarget()
+    local stageNow = currentStage()
+    if stageNow ~= observedStage then
+      observedStage = stageNow
+      targetInfo = nil
+      lastKnownPosition = nil
+      lastSeenAt = 0
+      targetSuppressedUntil = now + 8
+      normal = Vector3.yAxis
+      forward = tangentDirection(forward, normal)
+      setState("roam", rng:NextNumber(1, 2))
+      nextDecision = now + rng:NextNumber(1, 2)
+    end
+
+    -- Lock the current target during leap, cling, and retreat.
+    local visibleTarget
+    if state ~= "leap" and state ~= "cling" and state ~= "retreat" then
+      visibleTarget = updateTarget()
+    end
     local activeTarget = targetInfo
     local targetRoot = activeTarget and activeTarget.root
     local targetTorso = activeTarget and activeTarget.torso
@@ -370,12 +393,13 @@ local function makeCrawler(startPosition, startNormal)
       and workspace:GetAttribute("StageFourRelocating") == true
       and escortBulb and escortBulb:IsA("BasePart")
     local escortSlot = model:GetAttribute("EscortSlot")
-    if state == "escort" and not escortActive then
+    local isAssignedEscort = escortSlot == 1 or escortSlot == 2
+    if state == "escort" and (not escortActive or not isAssignedEscort) then
       setState("roam", rng:NextNumber(2, 4))
     end
 
-    -- Escorts resume formation whenever they are not responding to a visible player.
-    if escortActive and not visibleTarget and state ~= "leap"
+    -- Only the two assigned crawlers may enter escort formation.
+    if escortActive and isAssignedEscort and not visibleTarget and state ~= "leap"
       and state ~= "cling" and state ~= "retreat" then
       state = "escort"
       targetInfo = nil
@@ -396,10 +420,11 @@ local function makeCrawler(startPosition, startNormal)
       local orbit = math.sin(progress * math.pi * 2) * 0.18
       -- Stay attached to the front of the head and crawl slightly
       -- across the face before releasing.
+      local faceDepth = targetTorso.Size.Z * 0.5 + 0.12
       local localOffset = Vector3.new(
-        clingSide * (0.22 + orbit * 0.45),
-        -0.04 + math.sin(progress * math.pi * 2) * 0.08,
-        -0.68
+        clingSide * (0.22 + orbit * 0.25),
+        -0.04 + math.sin(progress * math.pi * 2) * 0.035,
+        -faceDepth
       )
       position = targetTorso.CFrame:PointToWorldSpace(localOffset)
       normal = -targetTorso.CFrame.LookVector
@@ -407,8 +432,9 @@ local function makeCrawler(startPosition, startNormal)
     elseif state == "leap" and targetRoot and targetTorso then
       local alpha = math.clamp((now - leapStarted) / leapDuration, 0, 1)
       local eased = alpha * alpha * (3 - 2 * alpha)
+      local faceDepth = targetTorso.Size.Z * 0.5 + 0.12
       local faceGoal = targetTorso.CFrame:PointToWorldSpace(
-        Vector3.new(clingSide * 0.22, -0.04, -0.68)
+        Vector3.new(clingSide * 0.22, -0.04, -faceDepth)
       )
       local arcHeight = math.sin(alpha * math.pi) * 1.35
       position = leapStart:Lerp(faceGoal, eased) + Vector3.yAxis * arcHeight
@@ -445,6 +471,9 @@ local function makeCrawler(startPosition, startNormal)
         targetInfo = nil
         targetRoot = nil
         targetTorso = nil
+        lastKnownPosition = nil
+        lastSeenAt = 0
+        targetSuppressedUntil = now + rng:NextNumber(8, 12)
         normal = Vector3.yAxis
         setState("roam", rng:NextNumber(2, 4))
       end
@@ -461,7 +490,7 @@ local function makeCrawler(startPosition, startNormal)
         end
       end
 
-      if state == "escort" and escortActive then
+      if state == "escort" and escortActive and isAssignedEscort then
         -- Slot 1 scouts ahead; slot 2 protects the bulb's rear flank.
         local bulbFrame = escortBulb.CFrame
         local slot = escortSlot or 2
@@ -562,8 +591,9 @@ local function makeCrawler(startPosition, startNormal)
               leapStart = position
               -- Aim just in front of the face; the leap phase adds a short arc.
               clingSide = side
+              local faceDepth = targetTorso.Size.Z * 0.5 + 0.12
               leapGoal = torsoCFrame:PointToWorldSpace(
-                Vector3.new(side * 0.22, -0.04, -0.68)
+                Vector3.new(side * 0.22, -0.04, -faceDepth)
               )
               leapStarted = now
               leapDuration = rng:NextNumber(0.38, 0.58)
@@ -785,8 +815,12 @@ while script.Parent do
       table.insert(escorts, escort)
     end
 
-    for index = 1, math.min(#escorts, 2) do
-      escorts[index]:SetAttribute("EscortSlot", index)
+    for index, escort in ipairs(escorts) do
+      if index <= 2 then
+        escort:SetAttribute("EscortSlot", index)
+      else
+        escort:SetAttribute("EscortSlot", nil)
+      end
     end
   end
 
