@@ -3397,8 +3397,13 @@ local function formStageFiveNest()
     settleTween.Completed:Wait()
   end
 
-  -- Four substantial root supports rise from the actual floor and disappear
-  -- inside the lower half of the bulb. These are the visual legs of the nest.
+  -- Give the newly hoisted core a moment to settle against its nest anchors.
+  -- The smaller ground roots grow only after this pause.
+  task.wait(3)
+  bulbRadius = math.max(infectionBulb.Size.Y * 0.5, 1)
+
+  -- Four slim ground anchors connect the underside of the bulb to points
+  -- embedded below the actual floor. Ground runners branch from floor level.
   local eggPointsFolder = workspace:FindFirstChild("StageFiveEggSpawnPoints")
   if eggPointsFolder then eggPointsFolder:Destroy() end
   eggPointsFolder = Instance.new("Folder")
@@ -3442,14 +3447,15 @@ local function formStageFiveNest()
     end
     if floorPosition and floorNormal then
       supportCount += 1
-      local base = floorPosition + floorNormal * 0.08
+      local surfaceBase = floorPosition + floorNormal * 0.04
+      local buriedBase = floorPosition - floorNormal * 0.38
       local insideBulb = infectionBulb.Position
-        - Vector3.new(0, bulbRadius * 0.68, 0) + radial * (bulbRadius * 0.18)
+        - Vector3.new(0, bulbRadius * 0.82, 0) + radial * (bulbRadius * 0.12)
       local support = growStageFiveVine(
-        "Stage5RootSupport" .. index, base, insideBulb,
-        0.92, rng:NextNumber(3.2, 4.0)
+        "Stage5RootSupport" .. index, buriedBase, insideBulb,
+        0.48, rng:NextNumber(2.2, 2.8)
       )
-      table.insert(rootTips, {position = base, direction = radial, support = support})
+      table.insert(rootTips, {position = surfaceBase, direction = radial, support = support})
 
       -- Egg spawn markers are placed along the ground runners below,
       -- not in a loose ring around the nest.
@@ -3457,7 +3463,7 @@ local function formStageFiveNest()
       -- back into the bulb instead of ending as isolated floating braces.
       for veinIndex = 1, 2 do
         local heightAlpha = veinIndex == 1 and 0.42 or 0.7
-        local veinStart = base:Lerp(insideBulb, heightAlpha)
+        local veinStart = buriedBase:Lerp(insideBulb, heightAlpha)
         local sideways = Vector3.new(-radial.Z, 0, radial.X)
         local veinEnd = veinStart + radial * 1.25 + sideways * (veinIndex == 1 and 0.7 or -0.7)
         growStageFiveVine(
@@ -3473,7 +3479,7 @@ local function formStageFiveNest()
         local spread = (branchIndex - 2) * math.rad(52)
         local direction = CFrame.fromAxisAngle(Vector3.yAxis, spread):VectorToWorldSpace(radial)
         local distance = rng:NextNumber(8, 11)
-        local previous = base
+        local previous = surfaceBase
         for segmentIndex = 1, 5 do
           local alpha = segmentIndex / 5
           local drift = Vector3.zero
@@ -3484,17 +3490,18 @@ local function formStageFiveNest()
           local ground = workspace:Raycast(probe, Vector3.new(0, -60, 0), floorParams)
           local nextPoint
           if ground and ground.Normal.Y > 0.82 then
-            nextPoint = ground.Position + ground.Normal * 0.1
-          elseif floorHit and floorHit.Normal.Y > 0.82 then
-            nextPoint = Vector3.new(target.X, floorHit.Position.Y + 0.1, target.Z)
+            nextPoint = ground.Position + ground.Normal * 0.06
           else
-            nextPoint = Vector3.new(target.X, base.Y + 0.1, target.Z)
+            -- Do not substitute the core's floor height here: that can make
+            -- runners float when the floor is uneven or interrupted.
+            warn("[INFECTION] Stage 5 ground runner stopped where local floor was not found.")
+            break
           end
 
           if nextPoint then
             growStageFiveVine(
               "Stage5GroundCrawlerVine", previous, nextPoint,
-              math.max(0.24, 0.36 - segmentIndex * 0.025),
+              math.max(0.18, 0.28 - segmentIndex * 0.02),
               rng:NextNumber(0.8, 1.15)
             )
 
