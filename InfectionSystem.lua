@@ -3499,6 +3499,18 @@ local function startStageFourRelocation()
 	growthStage = 4
 	workspace:SetAttribute("InfectionStage", growthStage)
 	relocationStarted = true
+
+	-- Publish the live bulb reference so the two existing Stage 3 crawlers
+	-- can escort it during relocation without guessing its original position.
+	local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+	if not bulbReference then
+		bulbReference = Instance.new("ObjectValue")
+		bulbReference.Name = "InfectionBulbReference"
+		bulbReference.Parent = workspace
+	end
+	bulbReference.Value = infectionBulb
+	workspace:SetAttribute("StageFourRelocating", true)
+
 	print("[INFECTION] Stage 4 relocation started.")
 
 	-- Finish resizing the body before calculating limb attachment points.
@@ -3524,9 +3536,19 @@ local function startStageFourRelocation()
 		growthStage = 5
 		workspace:SetAttribute("InfectionStage", growthStage)
 		relocationStarted = false
+		workspace:SetAttribute("StageFourRelocating", false)
+		local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+		if bulbReference and bulbReference:IsA("ObjectValue") then
+			bulbReference.Value = nil
+		end
 		formStageFiveNest()
 		print("[INFECTION] Stage 5 nest established.")
 	else
+		workspace:SetAttribute("StageFourRelocating", false)
+		local bulbReference = workspace:FindFirstChild("InfectionBulbReference")
+		if bulbReference and bulbReference:IsA("ObjectValue") then
+			bulbReference.Value = nil
+		end
 		warn("[INFECTION] Relocation stopped: check InfectionNestTarget and pathfinding.")
 	end
 	stageFourTransitionRunning = false
