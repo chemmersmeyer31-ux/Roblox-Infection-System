@@ -1455,23 +1455,20 @@ local function setCylinderBetween(part, pointA, pointB, thickness)
   local length = math.max(difference.Magnitude, 0.05)
   local axis = difference.Unit
 
-  local up = Vector3.new(0, 1, 0)
-  up = up - axis * up:Dot(axis)
-
-  if up.Magnitude < 0.05 then
-    up = Vector3.new(1, 0, 0)
-    up = up - axis * up:Dot(axis)
+  -- Roblox Cylinder parts use local Y as their length axis.
+  local right = Vector3.yAxis:Cross(axis)
+  if right.Magnitude < 0.05 then
+    right = Vector3.xAxis - axis * axis.X
   end
+  right = right.Unit
+  local back = right:Cross(axis).Unit
 
-  up = up.Unit
-  local side = axis:Cross(up).Unit
-
-  part.Size = Vector3.new(length, thickness, thickness)
+  part.Size = Vector3.new(thickness, length, thickness)
   part.CFrame = CFrame.fromMatrix(
     (pointA + pointB) * 0.5,
+    right,
     axis,
-    up,
-    side
+    back
   )
 end
 
@@ -3210,14 +3207,14 @@ local function setStageFiveVineBetween(vine, pointA, pointB, thickness)
   local difference = pointB - pointA
   local length = math.max(difference.Magnitude, 0.05)
   local axis = difference.Unit
-  local up = Vector3.new(0, 1, 0) - axis * axis.Y
-  if up.Magnitude < 0.05 then
-    up = Vector3.new(1, 0, 0) - axis * axis.X
+  local right = Vector3.yAxis:Cross(axis)
+  if right.Magnitude < 0.05 then
+    right = Vector3.xAxis - axis * axis.X
   end
-  up = up.Unit
-  local side = axis:Cross(up).Unit
-  vine.Size = Vector3.new(length, thickness, thickness)
-  vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
+  right = right.Unit
+  local back = right:Cross(axis).Unit
+  vine.Size = Vector3.new(thickness, length, thickness)
+  vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, right, axis, back)
 end
 
 local function growStageFiveVine(name, pointA, pointB, thickness, duration)
@@ -3228,22 +3225,22 @@ local function growStageFiveVine(name, pointA, pointB, thickness, duration)
   vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
   setStageFiveVineBetween(vine, pointA, pointA + axis * 0.03, thickness * 0.55)
 
+  local right = Vector3.yAxis:Cross(axis)
+  if right.Magnitude < 0.05 then
+    right = Vector3.xAxis - axis * axis.X
+  end
+  right = right.Unit
+  local back = right:Cross(axis).Unit
+  local targetCFrame = CFrame.fromMatrix(
+    (pointA + pointB) * 0.5,
+    right,
+    axis,
+    back
+  )
   local tween = TweenService:Create(
     vine,
     TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-    {Size = Vector3.new(length, thickness, thickness),
-     CFrame = CFrame.fromMatrix(
-      (pointA + pointB) * 0.5,
-      axis,
-      (Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
-        and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
-        or Vector3.new(1, 0, 0),
-      axis:Cross(
-        (Vector3.new(0, 1, 0) - axis * axis.Y).Magnitude > 0.05
-          and (Vector3.new(0, 1, 0) - axis * axis.Y).Unit
-          or Vector3.new(1, 0, 0)
-      ).Unit
-     )}
+    {Size = Vector3.new(thickness, length, thickness), CFrame = targetCFrame}
   )
   tween:Play()
   return vine
@@ -3437,6 +3434,12 @@ local function formStageFiveNest()
         floorNormal = deepFloor.Normal
       end
     end
+    if not floorPosition then
+      -- Guaranteed visual fallback: use the floor elevation already found
+      -- beneath the core, even if a radial ray misses a map seam.
+      floorPosition = Vector3.new(floorOrigin.X, groundPosition.Y, floorOrigin.Z)
+      floorNormal = Vector3.yAxis
+    end
     if floorPosition and floorNormal then
       supportCount += 1
       local base = floorPosition + floorNormal * 0.08
@@ -3484,6 +3487,8 @@ local function formStageFiveNest()
             nextPoint = ground.Position + ground.Normal * 0.1
           elseif floorHit and floorHit.Normal.Y > 0.82 then
             nextPoint = Vector3.new(target.X, floorHit.Position.Y + 0.1, target.Z)
+          else
+            nextPoint = Vector3.new(target.X, base.Y + 0.1, target.Z)
           end
 
           if nextPoint then
