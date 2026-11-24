@@ -3207,14 +3207,14 @@ local function setStageFiveVineBetween(vine, pointA, pointB, thickness)
   local difference = pointB - pointA
   local length = math.max(difference.Magnitude, 0.05)
   local axis = difference.Unit
-  local right = Vector3.yAxis:Cross(axis)
-  if right.Magnitude < 0.05 then
-    right = Vector3.xAxis - axis * axis.X
+  local up = Vector3.yAxis - axis * axis.Y
+  if up.Magnitude < 0.05 then
+    up = Vector3.zAxis - axis * axis.Z
   end
-  right = right.Unit
-  local back = right:Cross(axis).Unit
-  vine.Size = Vector3.new(thickness, length, thickness)
-  vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, right, axis, back)
+  up = up.Unit
+  local side = axis:Cross(up).Unit
+  vine.Size = Vector3.new(length, thickness, thickness)
+  vine.CFrame = CFrame.fromMatrix((pointA + pointB) * 0.5, axis, up, side)
 end
 
 local function growStageFiveVine(name, pointA, pointB, thickness, duration)
@@ -3225,22 +3225,22 @@ local function growStageFiveVine(name, pointA, pointB, thickness, duration)
   vine.Size = Vector3.new(0.06, thickness * 0.55, thickness * 0.55)
   setStageFiveVineBetween(vine, pointA, pointA + axis * 0.03, thickness * 0.55)
 
-  local right = Vector3.yAxis:Cross(axis)
-  if right.Magnitude < 0.05 then
-    right = Vector3.xAxis - axis * axis.X
+  local up = Vector3.yAxis - axis * axis.Y
+  if up.Magnitude < 0.05 then
+    up = Vector3.zAxis - axis * axis.Z
   end
-  right = right.Unit
-  local back = right:Cross(axis).Unit
+  up = up.Unit
+  local side = axis:Cross(up).Unit
   local targetCFrame = CFrame.fromMatrix(
     (pointA + pointB) * 0.5,
-    right,
     axis,
-    back
+    up,
+    side
   )
   local tween = TweenService:Create(
     vine,
     TweenInfo.new(duration or 1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-    {Size = Vector3.new(thickness, length, thickness), CFrame = targetCFrame}
+    {Size = Vector3.new(length, thickness, thickness), CFrame = targetCFrame}
   )
   tween:Play()
   return vine
