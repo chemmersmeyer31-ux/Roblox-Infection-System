@@ -2147,8 +2147,7 @@ local function performCeilingHoist(
   root,
   cocoonData,
   roofResult,
-  finalEntanglement,
-  outerLayer
+  finalEntanglement
 )
   if not root.Parent then return false end
 
@@ -2227,8 +2226,7 @@ local function performCeilingHoist(
   root.CFrame =
     hoistStartCFrame + Vector3.new(0, liftDistance, 0)
 
-  updateCocoonEntanglement(finalEntanglement, root, 1)
-  updateOuterVineLayer(outerLayer, root, 1)
+  updateBodyEntanglement(finalEntanglement, root, 1)
   updateHoistVines(vines, root, 1)
 
   print("[INFECTION] Cocoon hoist complete.")
@@ -2817,18 +2815,8 @@ attemptPlayerGrab = function(anchor, player, character, humanoid, root)
       sealed = true
       updateBodyEntanglement(finalEntanglement, root, 1)
 
-      -- Remove the temporary body-wrapping vines.
-      for _, strand in ipairs(entanglement.strands) do
-        for _, part in ipairs(strand.parts) do
-          if part and part.Parent then
-            part:Destroy()
-          end
-        end
-      end
-
-      table.clear(entanglement.strands)
-
-      -- Remove the original ground contact arms.
+      -- Keep the original wrapping vines attached during the lift.
+      -- Only the temporary ground contact arms are removed.
       for _, arm in ipairs(arms) do
         if arm.part and arm.part.Parent then
           arm.part:Destroy()
@@ -3427,12 +3415,18 @@ local function formStageFiveNest()
     local floorOrigin = infectionBulb.Position + radial * (bulbRadius * 0.72)
       + Vector3.new(0, 3, 0)
     local actualFloor = workspace:Raycast(floorOrigin, Vector3.new(0, -120, 0), floorParams)
-    if not actualFloor or actualFloor.Normal.Y <= 0.82 then
-      actualFloor = floorHit
-    end
+    local floorPosition
+    local floorNormal
     if actualFloor and actualFloor.Normal.Y > 0.82 then
+      floorPosition = actualFloor.Position
+      floorNormal = actualFloor.Normal
+    elseif floorHit and floorHit.Normal.Y > 0.82 then
+      floorPosition = Vector3.new(floorOrigin.X, floorHit.Position.Y, floorOrigin.Z)
+      floorNormal = floorHit.Normal
+    end
+    if floorPosition and floorNormal then
       supportCount += 1
-      local base = actualFloor.Position + actualFloor.Normal * 0.08
+      local base = floorPosition + floorNormal * 0.08
       local insideBulb = infectionBulb.Position
         - Vector3.new(0, bulbRadius * 0.68, 0) + radial * (bulbRadius * 0.18)
       local support = growStageFiveVine(
@@ -3472,12 +3466,14 @@ local function formStageFiveNest()
           local target = base + direction * (distance * alpha) + drift
           local probe = Vector3.new(target.X, previous.Y + 4, target.Z)
           local ground = workspace:Raycast(probe, Vector3.new(0, -60, 0), floorParams)
-          if not ground or ground.Normal.Y <= 0.82 then
-            ground = floorHit
+          local nextPoint
+          if ground and ground.Normal.Y > 0.82 then
+            nextPoint = ground.Position + ground.Normal * 0.1
+          elseif floorHit and floorHit.Normal.Y > 0.82 then
+            nextPoint = Vector3.new(target.X, floorHit.Position.Y + 0.1, target.Z)
           end
 
-          if ground and ground.Normal.Y > 0.82 then
-            local nextPoint = ground.Position + ground.Normal * 0.1
+          if nextPoint then
             growStageFiveVine(
               "Stage5GroundCrawlerVine", previous, nextPoint,
               math.max(0.24, 0.36 - segmentIndex * 0.025),
