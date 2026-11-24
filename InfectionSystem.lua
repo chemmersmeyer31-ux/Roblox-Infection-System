@@ -3159,10 +3159,10 @@ local function crawlToNestTarget()
 		print("[INFECTION] Stage 4: navmesh route unavailable; climbing the wall and passing through a clear window-height opening.")
 	end
 
-	-- Eight articulated spider legs surround the bulb. Alternating groups
-	-- use opposite stride phases to create a recognizable crawling gait.
+	-- Six articulated legs handle Stage 4 locomotion. Two future nest-support
+	-- limbs are deliberately held back for the Stage 5 transformation.
 	local legs = {}
-	for i = 1, 8 do
+	for i = 1, 6 do
 		legs[i] = makeWalkerLeg()
 	end
 
@@ -3200,7 +3200,7 @@ local function crawlToNestTarget()
 			)
 
 			for legIndex, leg in ipairs(legs) do
-				local angle = (legIndex - 1) * math.pi * 0.25
+				local angle = (legIndex - 1) * (math.pi * 2 / 6)
 				local localRadial = Vector3.new(math.cos(angle), 0, math.sin(angle))
 				local bodyFrame = infectionBulb.CFrame
 				local radial = bodyFrame:VectorToWorldSpace(localRadial)
@@ -3213,7 +3213,7 @@ local function crawlToNestTarget()
 				forward = forward.Unit
 
 				local phaseOffset = (legIndex % 2 == 0) and math.pi or 0
-				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * math.pi
+				local phase = os.clock() * 9 + phaseOffset + math.floor((legIndex - 1) / 2) * (math.pi * 2 / 3)
 				local stride = math.sin(phase)
 				local lift = math.max(0, math.cos(phase)) * 0.62
 				local hip = infectionBulb.Position + radial * 0.92 + Vector3.new(0, -0.18, 0)
@@ -3391,14 +3391,16 @@ local function formStageFiveNest()
 			local attachmentCount = math.min(#attachmentPoints, 4)
 			for index = 1, attachmentCount do
 				local wallPoint = attachmentPoints[index]
-				-- Grow from the wall inward and upward, finishing at the core.
-				-- The final end of each tendril visibly meets the raised bulb.
+				-- Nest anchors shoot outward from the core toward the walls.
+				-- The first two are thicker primary supports; the remaining
+				-- anchors branch out afterward to spread the suspended nest.
+				local thickness = index <= 2 and 0.88 or 0.58
 				growStageFiveVine(
-					"Stage5WallToCoreTendril",
-					wallPoint,
+					index <= 2 and "Stage5PrimaryCoreAnchor" or "Stage5CoreAnchor",
 					raisedPosition,
-					0.62,
-					rng:NextNumber(2.8, 3.8)
+					wallPoint,
+					thickness,
+					index <= 2 and rng:NextNumber(3.8, 4.6) or rng:NextNumber(2.6, 3.4)
 				)
 				task.wait(rng:NextNumber(0.45, 0.7))
 			end
@@ -3453,24 +3455,24 @@ local function formStageFiveNest()
 		settleTween.Completed:Wait()
 	end
 
-	-- Grow thick feeder roots from the underside of the single central bulb
-	-- down to the floor. The ground network begins at those connected roots,
-	-- rather than appearing as separate vines around the bulb.
+	-- Only two long support legs remain between the core and the floor.
+	-- This replaces the crowded six-root bundle and gives the bulb a cleaner,
+	-- deliberate connection to the ground while its wall anchors spread out.
 	local coreBottomY = math.max(infectionBulb.Position.Y - infectionBulb.Size.Y * 0.46, groundPosition.Y + 0.18)
 	local coreBottom = Vector3.new(infectionBulb.Position.X, coreBottomY, infectionBulb.Position.Z)
-	for index = 1, 6 do
-		local angle = (index - 1) * (math.pi * 2 / 6)
-		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
+	for index = 1, 2 do
+		local side = index == 1 and -1 or 1
+		local radial = Vector3.new(side, 0, 0)
 		local bulbSide = coreBottom + radial * (infectionBulb.Size.X * 0.28)
-		local floorJoin = groundPosition + radial * 0.22
+		local floorJoin = groundPosition + radial * 0.48
 		growStageFiveVine(
-			"Stage5BulbToGroundRoot",
+			"Stage5ElongatedLegSupport",
 			bulbSide,
 			floorJoin,
-			0.72,
-			2.4 + index * 0.12
+			0.86,
+			3.4 + index * 0.35
 		)
-		task.wait(0.22)
+		task.wait(0.38)
 	end
 
 	registerGroundAnchor(groundPosition, Vector3.new(0, 1, 0))
