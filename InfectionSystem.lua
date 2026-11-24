@@ -3409,11 +3409,13 @@ local function formStageFiveNest()
 			-- No usable wall anchors: stay grounded rather than floating on
 			-- four short decorative legs.
 			warn("[INFECTION] Fewer than two wall anchors found; keeping the Stage 5 core grounded. Add four InfectionNestAnchor parts to suspend it.")
-			TweenService:Create(
+			local settleTween = TweenService:Create(
 				infectionBulb,
 				TweenInfo.new(4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
 				{Position = groundPosition + Vector3.new(0, 0.55, 0), Size = Vector3.new(4.8, 4.8, 4.8)}
-			):Play()
+			)
+			settleTween:Play()
+			settleTween.Completed:Wait()
 		end
 	else
 		-- Outdoors, keep the central bulb close to the ground.
@@ -3440,7 +3442,8 @@ local function formStageFiveNest()
 	-- Grow thick feeder roots from the underside of the single central bulb
 	-- down to the floor. The ground network begins at those connected roots,
 	-- rather than appearing as separate vines around the bulb.
-	local coreBottom = infectionBulb.Position - Vector3.new(0, infectionBulb.Size.Y * 0.46, 0)
+	local coreBottomY = math.max(infectionBulb.Position.Y - infectionBulb.Size.Y * 0.46, groundPosition.Y + 0.18)
+	local coreBottom = Vector3.new(infectionBulb.Position.X, coreBottomY, infectionBulb.Position.Z)
 	for index = 1, 6 do
 		local angle = (index - 1) * (math.pi * 2 / 6)
 		local radial = Vector3.new(math.cos(angle), 0, math.sin(angle))
