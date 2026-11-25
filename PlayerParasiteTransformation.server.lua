@@ -34,63 +34,35 @@ local function randomColor()
   return COLORS[rng:NextInteger(1, #COLORS)]
 end
 
-local function makeGrowth(parent, bodyPart, size, localPosition)
-  local bulb = Instance.new("Part")
-  bulb.Name = "ParasiteBulb"
-  bulb.Shape = Enum.PartType.Ball
-  bulb.Size = size
-  bulb.Material = Enum.Material.SmoothPlastic
-  bulb.Color = randomColor()
-  bulb.Anchored = false
-  bulb.Massless = true
-  bulb.CanCollide = false
-  bulb.CanTouch = false
-  bulb.CanQuery = false
-  bulb.CFrame = bodyPart.CFrame * CFrame.new(localPosition)
-  bulb.Parent = parent
-
-  local weld = Instance.new("WeldConstraint")
-  weld.Part0 = bodyPart
-  weld.Part1 = bulb
-  weld.Parent = bulb
-  return bulb
-end
-
-local function addBodyGrowths(character)
-  local bodyParts = {}
+local function transformBodyAppearance(character)
+  -- Remove visual items that would cover the parasite body.
   for _, item in ipairs(character:GetChildren()) do
-    if item:IsA("BasePart") and item.Name ~= "HumanoidRootPart"
-      and item.Name ~= "ParasiteBackTendril" then
-      table.insert(bodyParts, item)
-      item.Material = Enum.Material.SmoothPlastic
-      item.Color = randomColor()
-      if item:IsA("MeshPart") then
-        item.TextureID = ""
-      end
-      for _, surface in ipairs(item:GetChildren()) do
-        if surface:IsA("SurfaceAppearance") or surface:IsA("Decal") then
-          surface:Destroy()
-        end
-      end
+    if item:IsA("Accessory")
+      or item:IsA("Shirt")
+      or item:IsA("Pants")
+      or item:IsA("ShirtGraphic")
+      or item:IsA("CharacterMesh")
+      or item:IsA("BodyColors") then
+      item:Destroy()
     end
   end
 
-  for _, bodyPart in ipairs(bodyParts) do
-    local name = bodyPart.Name
-    local count = 1
-    if string.find(name, "Torso") or name == "UpperTorso" then
-      count = 5
-    elseif string.find(name, "Arm") or string.find(name, "Leg") then
-      count = 2
+  for _, item in ipairs(character:GetDescendants()) do
+    if item:IsA("Decal") or item:IsA("Texture") or item:IsA("SurfaceAppearance") then
+      item:Destroy()
+    elseif item:IsA("SpecialMesh") then
+      item.TextureId = ""
     end
+  end
 
-    for index = 1, count do
-      local x = rng:NextNumber(-0.32, 0.32) * bodyPart.Size.X
-      local y = rng:NextNumber(-0.34, 0.34) * bodyPart.Size.Y
-      local z = (rng:NextNumber() < 0.5 and -1 or 1) * bodyPart.Size.Z * 0.48
-      local radius = rng:NextNumber(GROWTH_MIN, GROWTH_MAX)
-      local scale = Vector3.new(radius, radius * rng:NextNumber(0.8, 1.25), radius)
-      makeGrowth(character, bodyPart, scale, Vector3.new(x, y, z))
+  local parasiteColor = Color3.fromRGB(76, 39, 30)
+  for _, item in ipairs(character:GetChildren()) do
+    if item:IsA("BasePart") and item.Name ~= "HumanoidRootPart" then
+      item.Material = Enum.Material.CorrodedMetal
+      item.Color = parasiteColor
+      if item:IsA("MeshPart") then
+        item.TextureID = ""
+      end
     end
   end
 end
@@ -118,11 +90,11 @@ local function findNearestUninfected(character, origin)
   return nearest
 end
 
-local function setGroundVineSegment(part, startPosition, endPosition, facingDirection, radius)
+local function setGroundVineSegment(motor, torso, startPosition, endPosition, facingDirection, radius)
   local difference = endPosition - startPosition
   local length = difference.Magnitude
   if length < 0.025 then
-    part.Transparency = 1
+    motor.Enabled = false
     return
   end
 
@@ -137,13 +109,16 @@ local function setGroundVineSegment(part, startPosition, endPosition, facingDire
   up = up.Unit
   local side = axis:Cross(up)
   if side.Magnitude < 0.05 then
-    part.Transparency = 1
+    motor.Enabled = false
     return
   end
   side = side.Unit
-  part.Transparency = 0
+
+  local targetCFrame = CFrame.fromMatrix((startPosition + endPosition) * 0.5, axis, up, side)
+  local part = motor.Part1
   part.Size = Vector3.new(length + radius * 0.9, radius * 2, radius * 2)
-  part.CFrame = CFrame.fromMatrix((startPosition + endPosition) * 0.5, axis, up, side)
+  motor.C0 = torso.CFrame:ToObjectSpace(targetCFrame)
+  motor.Enabled = true
 end
 
 local function makeBackTendril(character, root)
@@ -151,31 +126,41 @@ local function makeBackTendril(character, root)
   folder.Name = "ParasiteBackTendril"
   folder.Parent = character
 
-  local function newVinePart(name, color)
+  local torso = character:FindFirstChild("UpperTorso")
+    or character:FindFirstChild("Torso")
+    or character:FindFirstChild("LowerTorso")
+    or root
+
+  local function newVinePart(name, color, size)
     local part = Instance.new("Part")
     part.Name = name
     part.Shape = Enum.PartType.Cylinder
     part.Material = Enum.Material.CorrodedMetal
-    part.Color = color or randomColor()
-    part.Anchored = true
+    part.Color = color or Color3.fromRGB(76, 39, 30)
+    part.Size = size or Vector3.new(0.5, 0.5, 0.5)
+    part.Anchored = false
+    part.Massless = true
     part.CanCollide = false
     part.CanTouch = false
     part.CanQuery = false
     part.CastShadow = true
-    part.Transparency = 1
-    part.Size = Vector3.new(0.05, 0.22, 0.22)
     part.Parent = folder
-    return part
+
+    local motor = Instance.new("Motor6D")
+    motor.Name = "BackVineAttachment"
+    motor.Part0 = torso
+    motor.Part1 = part
+    motor.C0 = torso.CFrame:ToObjectSpace(part.CFrame)
+    motor.C1 = CFrame.identity
+    motor.Parent = torso
+    return {part = part, motor = motor}
   end
 
-  -- Four short crawling runners root the stalk against the upper back.
   local roots = {}
   for index = 1, 4 do
     roots[index] = newVinePart("BackVineRootRunner", COLORS[(index % #COLORS) + 1])
   end
 
-  -- This uses the same segmented, rounded cylinder stalk construction as
-  -- PlayerFacingGroundVine in InfectionSystem.lua, scaled for the player's back.
   local stalkParts = {}
   for index = 1, 13 do
     stalkParts[index] = newVinePart("BackGroundVineStem", COLORS[(index % #COLORS) + 1])
@@ -186,12 +171,21 @@ local function makeBackTendril(character, root)
   rootBulb.Shape = Enum.PartType.Ball
   rootBulb.Size = Vector3.new(1.35, 1.5, 1.35)
   rootBulb.Material = Enum.Material.CorrodedMetal
-  rootBulb.Color = COLORS[2]
-  rootBulb.Anchored = true
+  rootBulb.Color = Color3.fromRGB(76, 39, 30)
+  rootBulb.Anchored = false
+  rootBulb.Massless = true
   rootBulb.CanCollide = false
   rootBulb.CanTouch = false
   rootBulb.CanQuery = false
   rootBulb.Parent = folder
+
+  local bulbMotor = Instance.new("Motor6D")
+  bulbMotor.Name = "BackVineBaseAttachment"
+  bulbMotor.Part0 = torso
+  bulbMotor.Part1 = rootBulb
+  bulbMotor.C0 = CFrame.new(0, 0, torso.Size.Z * 0.5 + 0.15)
+  bulbMotor.C1 = CFrame.identity
+  bulbMotor.Parent = torso
 
   local direction = root.CFrame.LookVector
   local phase = rng:NextNumber(0, math.pi * 2)
@@ -201,18 +195,13 @@ local function makeBackTendril(character, root)
   local connection
 
   connection = RunService.Heartbeat:Connect(function(dt)
-    if not character.Parent or not root.Parent or not folder.Parent then
+    if not character.Parent or not root.Parent or not folder.Parent or not torso.Parent then
       connection:Disconnect()
       folder:Destroy()
       return
     end
 
-    local torso = character:FindFirstChild("UpperTorso")
-      or character:FindFirstChild("Torso")
-      or character:FindFirstChild("LowerTorso")
-      or root
-    local origin = torso.CFrame:PointToWorldSpace(Vector3.new(0, 0.12, torso.Size.Z * 0.5 + 0.12))
-
+    local origin = torso.CFrame:PointToWorldSpace(Vector3.new(0, 0.12, torso.Size.Z * 0.5 + 0.15))
     if os.clock() >= nextTargetScan then
       targetRoot = findNearestUninfected(character, origin)
       nextTargetScan = os.clock() + 0.3
@@ -225,8 +214,7 @@ local function makeBackTendril(character, root)
       local horizontal = Vector3.new(offset.X, 0, offset.Z)
       if horizontal.Magnitude > 0.05 then
         desiredDirection = horizontal.Unit
-        local distance = offset.Magnitude
-        local proximity = 1 - math.clamp(distance / 55, 0, 1)
+        local proximity = 1 - math.clamp(offset.Magnitude / 55, 0, 1)
         leanAmount = 1.0 + proximity * 2.1
       end
     end
@@ -237,36 +225,28 @@ local function makeBackTendril(character, root)
     phase += dt * 2.0
     local sway = math.sin(phase) * 0.16
 
-    rootBulb.Position = origin
-    rootBulb.CFrame = CFrame.new(origin)
-
-    local right = root.CFrame.RightVector
-    for index, part in ipairs(roots) do
+    local right = torso.CFrame.RightVector
+    for index, item in ipairs(roots) do
       local sideSign = index % 2 == 0 and 1 or -1
       local verticalSign = index <= 2 and 1 or -1
-      local startPoint = origin + right * sideSign * 0.18
-        + Vector3.new(0, verticalSign * 0.18, 0)
+      local startPoint = origin + right * sideSign * 0.18 + Vector3.new(0, verticalSign * 0.18, 0)
       local endPoint = origin + right * sideSign * (0.72 + (index % 2) * 0.12)
         + Vector3.new(0, verticalSign * 0.38, 0)
-      setGroundVineSegment(part, startPoint, endPoint, direction, 0.16)
+      setGroundVineSegment(item.motor, torso, startPoint, endPoint, direction, 0.16)
     end
 
     local stemHeight = 5.8
     local visibleLean = currentLean + sway
     local function pathPoint(t)
       local bend = t * t
-      return origin + Vector3.new(
-        direction.X * visibleLean * bend,
-        stemHeight * t,
-        direction.Z * visibleLean * bend
-      )
+      return origin + Vector3.new(direction.X * visibleLean * bend, stemHeight * t, direction.Z * visibleLean * bend)
     end
 
-    for index, part in ipairs(stalkParts) do
+    for index, item in ipairs(stalkParts) do
       local t0 = (index - 1) / #stalkParts
       local t1 = index / #stalkParts
       local radius = 0.36 - (index / #stalkParts) * 0.075
-      setGroundVineSegment(part, pathPoint(t0), pathPoint(t1), direction, radius)
+      setGroundVineSegment(item.motor, torso, pathPoint(t0), pathPoint(t1), direction, radius)
     end
   end)
 
@@ -350,7 +330,7 @@ local function transformCharacter(character, player)
   end
 
   print("[PARASITE] Transforming " .. character.Name)
-  addBodyGrowths(character)
+  transformBodyAppearance(character)
   makeBackTendril(character, root)
   addProceduralAnimation(character, humanoid, root)
 end
