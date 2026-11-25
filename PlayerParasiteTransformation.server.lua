@@ -56,10 +56,11 @@ local function transformBodyAppearance(character)
   end
 
   local parasiteColor = Color3.fromRGB(76, 39, 30)
+  local headRustColor = Color3.fromRGB(119, 61, 39)
   for _, item in ipairs(character:GetChildren()) do
     if item:IsA("BasePart") and item.Name ~= "HumanoidRootPart" then
       item.Material = Enum.Material.CorrodedMetal
-      item.Color = parasiteColor
+      item.Color = item.Name == "Head" and headRustColor or parasiteColor
       if item:IsA("MeshPart") then
         item.TextureID = ""
       end
@@ -169,7 +170,7 @@ local function makeBackTendril(character, root)
   local rootBulb = Instance.new("Part")
   rootBulb.Name = "BackVineBulb"
   rootBulb.Shape = Enum.PartType.Ball
-  rootBulb.Size = Vector3.new(1.35, 1.5, 1.35)
+  rootBulb.Size = Vector3.new(0.95, 1.05, 0.95)
   rootBulb.Material = Enum.Material.CorrodedMetal
   rootBulb.Color = Color3.fromRGB(76, 39, 30)
   rootBulb.Anchored = false
@@ -189,7 +190,7 @@ local function makeBackTendril(character, root)
 
   local direction = root.CFrame.LookVector
   local phase = rng:NextNumber(0, math.pi * 2)
-  local currentLean = 0.2
+  local currentExtension = 0.75
   local targetRoot = nil
   local nextTargetScan = 0
   local connection
@@ -208,22 +209,24 @@ local function makeBackTendril(character, root)
     end
 
     local desiredDirection = root.CFrame.LookVector
-    local leanAmount = 0.45
+    local desiredExtension = 0.7
     if targetRoot and targetRoot.Parent then
       local offset = targetRoot.Position - origin
       local horizontal = Vector3.new(offset.X, 0, offset.Z)
       if horizontal.Magnitude > 0.05 then
+        -- The tendril turns around its back attachment to face the target.
         desiredDirection = horizontal.Unit
-        local proximity = 1 - math.clamp(offset.Magnitude / 55, 0, 1)
-        leanAmount = 1.0 + proximity * 2.1
+        local proximity = 1 - math.clamp(offset.Magnitude / 35, 0, 1)
+        -- It stays compact at range, then reaches farther as the target approaches.
+        desiredExtension = 0.75 + proximity * 2.0
       end
     end
 
-    direction = direction:Lerp(desiredDirection, math.clamp(dt * 3.5, 0, 1))
+    direction = direction:Lerp(desiredDirection, math.clamp(dt * 4.5, 0, 1))
     if direction.Magnitude > 0.05 then direction = direction.Unit end
-    currentLean += (leanAmount - currentLean) * math.clamp(dt * 2.8, 0, 1)
+    currentExtension += (desiredExtension - currentExtension) * math.clamp(dt * 2.6, 0, 1)
     phase += dt * 2.0
-    local sway = math.sin(phase) * 0.16
+    local sway = math.sin(phase) * 0.09
 
     local right = torso.CFrame.RightVector
     for index, item in ipairs(roots) do
@@ -232,20 +235,22 @@ local function makeBackTendril(character, root)
       local startPoint = origin + right * sideSign * 0.18 + Vector3.new(0, verticalSign * 0.18, 0)
       local endPoint = origin + right * sideSign * (0.72 + (index % 2) * 0.12)
         + Vector3.new(0, verticalSign * 0.38, 0)
-      setGroundVineSegment(item.motor, torso, startPoint, endPoint, direction, 0.16)
+      setGroundVineSegment(item.motor, torso, startPoint, endPoint, direction, 0.105)
     end
 
-    local stemHeight = 5.8
-    local visibleLean = currentLean + sway
+    local stemHeight = 3.65
+    local visibleExtension = currentExtension + sway
     local function pathPoint(t)
       local bend = t * t
-      return origin + Vector3.new(direction.X * visibleLean * bend, stemHeight * t, direction.Z * visibleLean * bend)
+      return origin
+        + Vector3.new(direction.X * visibleExtension * bend, stemHeight * t, direction.Z * visibleExtension * bend)
+        + Vector3.new(0, math.sin(t * math.pi) * 0.18, 0)
     end
 
     for index, item in ipairs(stalkParts) do
       local t0 = (index - 1) / #stalkParts
       local t1 = index / #stalkParts
-      local radius = 0.36 - (index / #stalkParts) * 0.075
+      local radius = 0.205 - (index / #stalkParts) * 0.085
       setGroundVineSegment(item.motor, torso, pathPoint(t0), pathPoint(t1), direction, radius)
     end
   end)
