@@ -41,6 +41,8 @@ local spawner = workspace:WaitForChild(SPAWNER_NAME)
 
 assert(spawner:IsA("BasePart"), SPAWNER_NAME .. " must be a Part or other BasePart")
 
+local infectionEvent = game:GetService("ServerScriptService"):WaitForChild("ParasiteInfectionEvent")
+
 spawner.Anchored = true
 spawner.Transparency = 1
 spawner.CanCollide = false
@@ -296,6 +298,12 @@ local function runGrab(player, root, humanoid)
   animateArm(parts, tip, root, originalCFrame, raisedCFrame, LIFT_TIME, 1, 1)
 
   task.wait(HOLD_TIME)
+
+  -- The arm infects the player while they are still suspended.
+  if root.Parent and humanoid.Health > 0 then
+    infectionEvent:Fire(character, player)
+    task.wait(1.2)
+  end
 
   if root.Parent then
     animateArm(parts, tip, root, raisedCFrame, originalCFrame, LOWER_TIME, 1, 1)
