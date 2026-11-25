@@ -35,6 +35,22 @@ local function setupCharacter(character)
 			return
 		end
 
+		-- Take over the infected character's animation locally, after this
+		-- client has detected the infection. Do not disable Animate on the
+		-- server: each client must disable its own copy so this LocalScript
+		-- can immediately provide the replacement pose below.
+		local animateScript = character:FindFirstChild("Animate")
+		if animateScript and animateScript:IsA("LocalScript") then
+			animateScript.Disabled = true
+		end
+
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+				track:Stop(0.1)
+			end
+		end
+
 		local joints = {
 			Root = findMotor(character, "Root"),
 			Waist = findMotor(character, "Waist"),
