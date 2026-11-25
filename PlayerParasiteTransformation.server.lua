@@ -64,6 +64,14 @@ local function addBodyGrowths(character)
       table.insert(bodyParts, item)
       item.Material = Enum.Material.SmoothPlastic
       item.Color = randomColor()
+      if item:IsA("MeshPart") then
+        item.TextureID = ""
+      end
+      for _, surface in ipairs(item:GetChildren()) do
+        if surface:IsA("SurfaceAppearance") or surface:IsA("Decal") then
+          surface:Destroy()
+        end
+      end
     end
   end
 
@@ -144,6 +152,8 @@ local function makeBackTendril(character, root)
   baseBulb.Parent = folder
 
   local phase = rng:NextNumber(0, math.pi * 2)
+  local targetRoot = nil
+  local nextTargetScan = 0
   local connection
   connection = RunService.Heartbeat:Connect(function(dt)
     if not character.Parent or not root.Parent or not folder.Parent then
@@ -153,11 +163,14 @@ local function makeBackTendril(character, root)
     end
 
     local origin = root.CFrame:PointToWorldSpace(Vector3.new(0, 1.15, 0.9))
-    local target = findNearestUninfected(character, origin)
+    if os.clock() >= nextTargetScan then
+      targetRoot = findNearestUninfected(character, origin)
+      nextTargetScan = os.clock() + 0.3
+    end
     local direction
 
-    if target then
-      direction = target.Position - origin
+    if targetRoot and targetRoot.Parent then
+      direction = targetRoot.Position - origin
     else
       direction = root.CFrame.LookVector
     end
