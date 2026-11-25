@@ -189,6 +189,9 @@ local function makeBackTendril(character, root)
   bulbMotor.Parent = torso
 
   local direction = root.CFrame.LookVector
+  -- Keep the tendril on one consistent anatomical side. Re-selecting this
+  -- every frame makes it jump across the character when the target moves.
+  local sideSign = 1
   local phase = rng:NextNumber(0, math.pi * 2)
   local currentExtension = 1.0
   local targetRoot = nil
@@ -246,7 +249,6 @@ local function makeBackTendril(character, root)
     -- then angles its tip toward the enemy from that elevated position.
     local stemHeight = 4.65
     local visibleExtension = currentExtension + sway
-    local sideSign = direction:Dot(torso.CFrame.RightVector) >= 0 and 1 or -1
     local sideDirection = torso.CFrame.RightVector * sideSign
     local function pathPoint(t)
       local bend = t * t
