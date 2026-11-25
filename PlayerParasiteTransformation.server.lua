@@ -190,7 +190,7 @@ local function makeBackTendril(character, root)
 
   local direction = root.CFrame.LookVector
   local phase = rng:NextNumber(0, math.pi * 2)
-  local currentExtension = 0.75
+  local currentExtension = 1.0
   local targetRoot = nil
   local nextTargetScan = 0
   local connection
@@ -209,7 +209,7 @@ local function makeBackTendril(character, root)
     end
 
     local desiredDirection = root.CFrame.LookVector
-    local desiredExtension = 0.7
+    local desiredExtension = 1.0
     if targetRoot and targetRoot.Parent then
       local offset = targetRoot.Position - origin
       local horizontal = Vector3.new(offset.X, 0, offset.Z)
@@ -218,7 +218,7 @@ local function makeBackTendril(character, root)
         desiredDirection = horizontal.Unit
         local proximity = 1 - math.clamp(offset.Magnitude / 35, 0, 1)
         -- It stays compact at range, then reaches farther as the target approaches.
-        desiredExtension = 0.75 + proximity * 2.0
+        desiredExtension = 1.0 + proximity * 2.5
       end
     end
 
@@ -238,19 +238,29 @@ local function makeBackTendril(character, root)
       setGroundVineSegment(item.motor, torso, startPoint, endPoint, direction, 0.105)
     end
 
-    local stemHeight = 3.65
+    -- A fuller, taller reach: the tendril rises to shoulder height,
+    -- sweeps around the nearest side of the infected character, then reaches
+    -- toward the target. Extension increases as the target gets close.
+    local stemHeight = 4.65
     local visibleExtension = currentExtension + sway
+    local sideSign = direction:Dot(torso.CFrame.RightVector) >= 0 and 1 or -1
+    local sideDirection = torso.CFrame.RightVector * sideSign
     local function pathPoint(t)
       local bend = t * t
+      local sideSweep = math.sin(t * math.pi) * 1.05
+      local forwardReach = visibleExtension * bend
+      local shoulderLift = math.sin(t * math.pi) * 0.28
       return origin
-        + Vector3.new(direction.X * visibleExtension * bend, stemHeight * t, direction.Z * visibleExtension * bend)
-        + Vector3.new(0, math.sin(t * math.pi) * 0.18, 0)
+        + sideDirection * sideSweep
+        + direction * forwardReach
+        + Vector3.new(0, stemHeight * t + shoulderLift, 0)
     end
 
     for index, item in ipairs(stalkParts) do
       local t0 = (index - 1) / #stalkParts
       local t1 = index / #stalkParts
-      local radius = 0.205 - (index / #stalkParts) * 0.085
+      local taper = index / #stalkParts
+      local radius = 0.285 - taper * 0.105
       setGroundVineSegment(item.motor, torso, pathPoint(t0), pathPoint(t1), direction, radius)
     end
   end)
