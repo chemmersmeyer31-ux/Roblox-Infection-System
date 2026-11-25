@@ -184,7 +184,7 @@ local function makeBackTendril(character, root)
   bulbMotor.Name = "BackVineBaseAttachment"
   bulbMotor.Part0 = torso
   bulbMotor.Part1 = rootBulb
-  bulbMotor.C0 = CFrame.new(0, 0, torso.Size.Z * 0.5 + 0.15)
+  bulbMotor.C0 = CFrame.new(0, 0, torso.Size.Z * 0.5 + 0.45)
   bulbMotor.C1 = CFrame.identity
   bulbMotor.Parent = torso
 
@@ -202,7 +202,7 @@ local function makeBackTendril(character, root)
       return
     end
 
-    local origin = torso.CFrame:PointToWorldSpace(Vector3.new(0, 0.12, torso.Size.Z * 0.5 + 0.15))
+    local origin = torso.CFrame:PointToWorldSpace(Vector3.new(0, 0.12, torso.Size.Z * 0.5 + 0.45))
     if os.clock() >= nextTargetScan then
       targetRoot = findNearestUninfected(character, origin)
       nextTargetScan = os.clock() + 0.3
