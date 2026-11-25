@@ -291,7 +291,7 @@ local function addProceduralAnimation(character, humanoid, root)
         or key == "rightarm" or key == "leftarm"
         or key == "righthip" or key == "lefthip"
         or key == "rightleg" or key == "leftleg"
-        or key == "waist" then
+        or key == "waist" or key == "neck" then
         joints[key] = {motor = item, base = item.C0}
       end
     end
@@ -300,9 +300,14 @@ local function addProceduralAnimation(character, humanoid, root)
   local rootJoint = joints.rootjoint or joints.root or joints.waist
   if not rootJoint then return end
 
+  local neck = joints.neck
   local startTime = os.clock()
+  local targetRoot = nil
+  local nextTargetScan = 0
+  local smoothedHeadYaw = 0
+  local smoothedHeadPitch = 0
   local connection
-  connection = RunService.Heartbeat:Connect(function()
+  connection = RunService.Heartbeat:Connect(function(dt)
     if not character.Parent or humanoid.Health <= 0 or not rootJoint.motor.Parent then
       connection:Disconnect()
       return
@@ -312,13 +317,16 @@ local function addProceduralAnimation(character, humanoid, root)
     local moving = humanoid.MoveDirection.Magnitude > 0.08
     local speed = moving and 8.5 or 2.1
     local wave = math.sin(elapsed * speed)
-    local bob = wave * (moving and 0.07 or 0.025)
-    local lean = moving and 0.13 or 0.035
-    local roll = math.sin(elapsed * (moving and 4.25 or 1.05)) * 0.04
+    local idleWave = math.sin(elapsed * 1.15)
+    local bob = moving and wave * 0.07 or idleWave * 0.025
+    local lean = moving and 0.16 or 0.045
+    local roll = math.sin(elapsed * (moving and 4.25 or 0.9)) * (moving and 0.04 or 0.055)
+    local idleRock = moving and 0 or idleWave * 0.035
 
+    -- A slightly hunched walk, with a slower uneven rock while standing.
     rootJoint.motor.C0 = rootJoint.base
       * CFrame.new(0, bob, 0)
-      * CFrame.Angles(lean, 0, roll)
+      * CFrame.Angles(lean, 0, roll + idleRock)
 
     local rightShoulder = joints.rightshoulder or joints.rightarm
     local leftShoulder = joints.leftshoulder or joints.leftarm
@@ -326,7 +334,7 @@ local function addProceduralAnimation(character, humanoid, root)
     local leftHip = joints.lefthip or joints.leftleg
 
     local armSwing = moving and wave * 0.42 or math.sin(elapsed * 1.2) * 0.045
-    local legSwing = moving and -wave * 0.34 or 0.015
+    local legSwing = moving and -wave * 0.34 or math.sin(elapsed * 0.8) * 0.018
 
     if rightShoulder then
       rightShoulder.motor.C0 = rightShoulder.base * CFrame.Angles(armSwing - 0.16, 0, -0.12)
@@ -339,6 +347,37 @@ local function addProceduralAnimation(character, humanoid, root)
     end
     if leftHip then
       leftHip.motor.C0 = leftHip.base * CFrame.Angles(-legSwing, 0, 0)
+    end
+
+    -- The head occasionally tilts while idle and turns toward the nearest
+    -- uninfected character when one is around.
+    if neck then
+      if os.clock() >= nextTargetScan then
+        targetRoot = findNearestUninfected(character, root.Position)
+        nextTargetScan = os.clock() + 0.4
+      end
+
+      local desiredYaw = 0
+      local desiredPitch = 0
+      if targetRoot and targetRoot.Parent then
+        local head = character:FindFirstChild("Head")
+        if head then
+          local offset = root.CFrame:PointToObjectSpace(targetRoot.Position + Vector3.new(0, 1.2, 0))
+          desiredYaw = math.clamp(math.atan2(-offset.X, -offset.Z), -0.65, 0.65)
+          local horizontalDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+          desiredPitch = math.clamp(math.atan2(offset.Y - 1.2, math.max(horizontalDistance, 0.1)), -0.3, 0.3)
+        end
+      else
+        desiredYaw = math.sin(elapsed * 0.7) * 0.12
+        desiredPitch = math.sin(elapsed * 0.9 + 1) * 0.07
+      end
+
+      local blend = math.clamp(dt * 3.5, 0, 1)
+      smoothedHeadYaw += (desiredYaw - smoothedHeadYaw) * blend
+      smoothedHeadPitch += (desiredPitch - smoothedHeadPitch) * blend
+      local idleTilt = targetRoot and 0 or math.sin(elapsed * 0.65) * 0.045
+      neck.motor.C0 = neck.base
+        * CFrame.Angles(smoothedHeadPitch, smoothedHeadYaw, idleTilt)
     end
   end)
 end
