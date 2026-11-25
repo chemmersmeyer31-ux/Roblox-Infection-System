@@ -298,6 +298,7 @@ local function disableDefaultAnimations(character, humanoid)
 end
 
 local function addProceduralAnimation(character, humanoid, root)
+  disableDefaultAnimations(character, humanoid)
   local joints = {}
 
   -- Normalize names so this works with both R6 names ("Right Shoulder")
