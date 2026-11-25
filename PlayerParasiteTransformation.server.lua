@@ -118,43 +118,88 @@ local function findNearestUninfected(character, origin)
   return nearest
 end
 
+local function setGroundVineSegment(part, startPosition, endPosition, facingDirection, radius)
+  local difference = endPosition - startPosition
+  local length = difference.Magnitude
+  if length < 0.025 then
+    part.Transparency = 1
+    return
+  end
+
+  local axis = difference.Unit
+  local up = facingDirection - axis * facingDirection:Dot(axis)
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(1, 0, 0) - axis * axis.X
+  end
+  if up.Magnitude < 0.05 then
+    up = Vector3.new(0, 0, 1) - axis * axis.Z
+  end
+  up = up.Unit
+  local side = axis:Cross(up)
+  if side.Magnitude < 0.05 then
+    part.Transparency = 1
+    return
+  end
+  side = side.Unit
+  part.Transparency = 0
+  part.Size = Vector3.new(length + radius * 0.9, radius * 2, radius * 2)
+  part.CFrame = CFrame.fromMatrix((startPosition + endPosition) * 0.5, axis, up, side)
+end
+
 local function makeBackTendril(character, root)
   local folder = Instance.new("Folder")
   folder.Name = "ParasiteBackTendril"
   folder.Parent = character
 
-  local segments = {}
-  for index = 1, TENDRIL_SEGMENTS do
+  local function newVinePart(name, color)
     local part = Instance.new("Part")
-    part.Name = "BackVineSegment"
-    part.Shape = Enum.PartType.Ball
-    part.Material = Enum.Material.SmoothPlastic
-    part.Color = COLORS[(index % #COLORS) + 1]
+    part.Name = name
+    part.Shape = Enum.PartType.Cylinder
+    part.Material = Enum.Material.CorrodedMetal
+    part.Color = color or randomColor()
     part.Anchored = true
     part.CanCollide = false
     part.CanTouch = false
     part.CanQuery = false
     part.CastShadow = true
+    part.Transparency = 1
+    part.Size = Vector3.new(0.05, 0.22, 0.22)
     part.Parent = folder
-    table.insert(segments, part)
+    return part
   end
 
-  local baseBulb = Instance.new("Part")
-  baseBulb.Name = "BackVineRoot"
-  baseBulb.Shape = Enum.PartType.Ball
-  baseBulb.Size = Vector3.new(1.7, 1.8, 1.7)
-  baseBulb.Material = Enum.Material.SmoothPlastic
-  baseBulb.Color = COLORS[2]
-  baseBulb.Anchored = true
-  baseBulb.CanCollide = false
-  baseBulb.CanTouch = false
-  baseBulb.CanQuery = false
-  baseBulb.Parent = folder
+  -- Four short crawling runners root the stalk against the upper back.
+  local roots = {}
+  for index = 1, 4 do
+    roots[index] = newVinePart("BackVineRootRunner", COLORS[(index % #COLORS) + 1])
+  end
 
+  -- This uses the same segmented, rounded cylinder stalk construction as
+  -- PlayerFacingGroundVine in InfectionSystem.lua, scaled for the player's back.
+  local stalkParts = {}
+  for index = 1, 13 do
+    stalkParts[index] = newVinePart("BackGroundVineStem", COLORS[(index % #COLORS) + 1])
+  end
+
+  local rootBulb = Instance.new("Part")
+  rootBulb.Name = "BackVineBulb"
+  rootBulb.Shape = Enum.PartType.Ball
+  rootBulb.Size = Vector3.new(1.35, 1.5, 1.35)
+  rootBulb.Material = Enum.Material.CorrodedMetal
+  rootBulb.Color = COLORS[2]
+  rootBulb.Anchored = true
+  rootBulb.CanCollide = false
+  rootBulb.CanTouch = false
+  rootBulb.CanQuery = false
+  rootBulb.Parent = folder
+
+  local direction = root.CFrame.LookVector
   local phase = rng:NextNumber(0, math.pi * 2)
+  local currentLean = 0.2
   local targetRoot = nil
   local nextTargetScan = 0
   local connection
+
   connection = RunService.Heartbeat:Connect(function(dt)
     if not character.Parent or not root.Parent or not folder.Parent then
       connection:Disconnect()
@@ -162,60 +207,66 @@ local function makeBackTendril(character, root)
       return
     end
 
-    local origin = root.CFrame:PointToWorldSpace(Vector3.new(0, 1.15, 0.9))
+    local torso = character:FindFirstChild("UpperTorso")
+      or character:FindFirstChild("Torso")
+      or character:FindFirstChild("LowerTorso")
+      or root
+    local origin = torso.CFrame:PointToWorldSpace(Vector3.new(0, 0.12, torso.Size.Z * 0.5 + 0.12))
+
     if os.clock() >= nextTargetScan then
       targetRoot = findNearestUninfected(character, origin)
       nextTargetScan = os.clock() + 0.3
     end
-    local direction
 
+    local desiredDirection = root.CFrame.LookVector
+    local leanAmount = 0.45
     if targetRoot and targetRoot.Parent then
-      direction = targetRoot.Position - origin
-    else
-      direction = root.CFrame.LookVector
-    end
-
-    if direction.Magnitude < 0.05 then
-      direction = root.CFrame.LookVector
-    end
-    direction = direction.Unit
-
-    phase += dt * 1.8
-    local sway = math.sin(phase) * 0.35
-    local side = direction:Cross(Vector3.yAxis)
-    if side.Magnitude < 0.05 then
-      side = root.CFrame.RightVector
-    end
-    side = side.Unit
-
-    local endPosition = origin + direction * TENDRIL_LENGTH
-      + Vector3.new(0, 1.0 + sway, 0)
-    local control = origin + direction * (TENDRIL_LENGTH * 0.48)
-      + Vector3.new(0, 2.1 + sway, 0) + side * sway
-
-    baseBulb.Position = origin
-    baseBulb.CFrame = CFrame.new(origin)
-
-    for index, part in ipairs(segments) do
-      local alpha = (index - 0.5) / TENDRIL_SEGMENTS
-      local inverse = 1 - alpha
-      local position = origin * (inverse * inverse)
-        + control * (2 * inverse * alpha)
-        + endPosition * (alpha * alpha)
-      local tangent = (control - origin):Lerp(endPosition - control, alpha)
-      if tangent.Magnitude < 0.05 then tangent = direction end
-      local radius = 0.72 - alpha * 0.43
-      local length = TENDRIL_LENGTH / TENDRIL_SEGMENTS * 1.55
-      part.Size = Vector3.new(length, radius * 2, radius * 2)
-      local axis = tangent.Unit
-      local up = Vector3.yAxis - axis * axis.Y
-      if up.Magnitude < 0.05 then
-        up = Vector3.zAxis - axis * axis.Z
+      local offset = targetRoot.Position - origin
+      local horizontal = Vector3.new(offset.X, 0, offset.Z)
+      if horizontal.Magnitude > 0.05 then
+        desiredDirection = horizontal.Unit
+        local distance = offset.Magnitude
+        local proximity = 1 - math.clamp(distance / 55, 0, 1)
+        leanAmount = 1.0 + proximity * 2.1
       end
-      up = up.Unit
-      local sideAxis = axis:Cross(up).Unit
-      up = sideAxis:Cross(axis).Unit
-      part.CFrame = CFrame.fromMatrix(position, axis, up, sideAxis)
+    end
+
+    direction = direction:Lerp(desiredDirection, math.clamp(dt * 3.5, 0, 1))
+    if direction.Magnitude > 0.05 then direction = direction.Unit end
+    currentLean += (leanAmount - currentLean) * math.clamp(dt * 2.8, 0, 1)
+    phase += dt * 2.0
+    local sway = math.sin(phase) * 0.16
+
+    rootBulb.Position = origin
+    rootBulb.CFrame = CFrame.new(origin)
+
+    local right = root.CFrame.RightVector
+    for index, part in ipairs(roots) do
+      local sideSign = index % 2 == 0 and 1 or -1
+      local verticalSign = index <= 2 and 1 or -1
+      local startPoint = origin + right * sideSign * 0.18
+        + Vector3.new(0, verticalSign * 0.18, 0)
+      local endPoint = origin + right * sideSign * (0.72 + (index % 2) * 0.12)
+        + Vector3.new(0, verticalSign * 0.38, 0)
+      setGroundVineSegment(part, startPoint, endPoint, direction, 0.16)
+    end
+
+    local stemHeight = 5.8
+    local visibleLean = currentLean + sway
+    local function pathPoint(t)
+      local bend = t * t
+      return origin + Vector3.new(
+        direction.X * visibleLean * bend,
+        stemHeight * t,
+        direction.Z * visibleLean * bend
+      )
+    end
+
+    for index, part in ipairs(stalkParts) do
+      local t0 = (index - 1) / #stalkParts
+      local t1 = index / #stalkParts
+      local radius = 0.36 - (index / #stalkParts) * 0.075
+      setGroundVineSegment(part, pathPoint(t0), pathPoint(t1), direction, radius)
     end
   end)
 
@@ -223,11 +274,6 @@ local function makeBackTendril(character, root)
 end
 
 local function addProceduralAnimation(character, humanoid, root)
-  local animateScript = character:FindFirstChild("Animate")
-  if animateScript and animateScript:IsA("LocalScript") then
-    animateScript.Disabled = true
-  end
-
   local joints = {}
   for _, item in ipairs(character:GetDescendants()) do
     if item:IsA("Motor6D") then
