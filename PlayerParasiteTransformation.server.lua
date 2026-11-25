@@ -491,7 +491,7 @@ local function transformCharacter(character, player)
   print("[PARASITE] Transforming " .. character.Name)
   transformBodyAppearance(character)
   makeBackTendril(character, root)
-  addProceduralAnimation(character, humanoid, root)
+  -- Body animation is handled locally by ParasiteBodyAnimation.client.lua on each client.
 end
 
 event.Event:Connect(function(character, player)
