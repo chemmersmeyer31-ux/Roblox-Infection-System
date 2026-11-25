@@ -29,6 +29,8 @@ local function setupCharacter(character)
 			return
 		end
 
+		-- Character parts can replicate after the Model and infection attribute.
+		-- DescendantAdded below retries setup as the R15 rig arrives.
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		local rootPart = character:FindFirstChild("HumanoidRootPart")
 		if not humanoid or not rootPart then
@@ -88,8 +90,16 @@ local function setupCharacter(character)
 		print("[PARASITE] R15 body animation active: " .. character.Name)
 	end
 
-	tryStart()
+	-- Listen before the first attempt so we don't miss parts that replicate later.
+	character.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("Humanoid") or descendant:IsA("BasePart")
+			or descendant:IsA("Motor6D") or descendant.Name == "Animate" then
+			tryStart()
+		end
+	end)
+
 	character:GetAttributeChangedSignal("IsInfected"):Connect(tryStart)
+	tryStart()
 end
 
 for _, character in ipairs(workspace:GetChildren()) do
