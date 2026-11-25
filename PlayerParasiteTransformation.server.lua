@@ -281,76 +281,167 @@ local function makeBackTendril(character, root)
   return folder
 end
 
+local function disableDefaultAnimations(character, humanoid)
+  -- The default Animate LocalScript keeps starting Roblox's normal idle/walk
+  -- tracks. Disable it before taking control of the infected body's joints.
+  local animateScript = character:FindFirstChild("Animate")
+  if animateScript and animateScript:IsA("LocalScript") then
+    animateScript.Disabled = true
+  end
+
+  local animator = humanoid:FindFirstChildOfClass("Animator")
+  if animator then
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+      track:Stop(0.12)
+    end
+  end
+end
+
 local function addProceduralAnimation(character, humanoid, root)
   local joints = {}
+
+  -- Normalize names so this works with both R6 names ("Right Shoulder")
+  -- and R15 names ("RightShoulder").
   for _, item in ipairs(character:GetDescendants()) do
     if item:IsA("Motor6D") then
       local key = string.lower(item.Name):gsub("[%s_]", "")
-      if key == "root" or key == "rootjoint"
-        or key == "rightshoulder" or key == "leftshoulder"
-        or key == "rightarm" or key == "leftarm"
-        or key == "righthip" or key == "lefthip"
-        or key == "rightleg" or key == "leftleg"
-        or key == "waist" or key == "neck" then
-        joints[key] = {motor = item, base = item.C0}
-      end
+      joints[key] = {motor = item, base = item.C0}
     end
   end
 
-  local rootJoint = joints.rootjoint or joints.root or joints.waist
-  if not rootJoint then return end
+  local function getJoint(...)
+    for _, name in ipairs({...}) do
+      if joints[name] then return joints[name] end
+    end
+    return nil
+  end
 
-  local neck = joints.neck
+  local rootJoint = getJoint("rootjoint", "root")
+  local waist = getJoint("waist")
+  local neck = getJoint("neck")
+
+  local rightShoulder = getJoint("rightshoulder")
+  local leftShoulder = getJoint("leftshoulder")
+  local rightElbow = getJoint("rightelbow")
+  local leftElbow = getJoint("leftelbow")
+  local rightWrist = getJoint("rightwrist")
+  local leftWrist = getJoint("leftwrist")
+
+  local rightHip = getJoint("righthip")
+  local leftHip = getJoint("lefthip")
+  local rightKnee = getJoint("rightknee")
+  local leftKnee = getJoint("leftknee")
+  local rightAnkle = getJoint("rightankle")
+  local leftAnkle = getJoint("leftankle")
+
+  -- R6 has no separate elbows, knees, wrists, or ankles. Those joints are
+  -- simply skipped; the matching R15 joints are animated when they exist.
+  if not rootJoint and not waist then
+    warn("[PARASITE] No supported body root joints found on " .. character.Name)
+    return
+  end
+
   local startTime = os.clock()
   local targetRoot = nil
   local nextTargetScan = 0
   local smoothedHeadYaw = 0
   local smoothedHeadPitch = 0
+  local movementBlend = 0
+  local gaitPhase = 0
   local connection
+
+  local function apply(joint, offset)
+    if joint and joint.motor and joint.motor.Parent then
+      joint.motor.C0 = joint.base * offset
+    end
+  end
+
   connection = RunService.Heartbeat:Connect(function(dt)
-    if not character.Parent or humanoid.Health <= 0 or not rootJoint.motor.Parent then
+    if not character.Parent or humanoid.Health <= 0 then
       connection:Disconnect()
       return
     end
 
     local elapsed = os.clock() - startTime
-    local moving = humanoid.MoveDirection.Magnitude > 0.08
-    local speed = moving and 8.5 or 2.1
-    local wave = math.sin(elapsed * speed)
-    local idleWave = math.sin(elapsed * 1.15)
-    local bob = moving and wave * 0.07 or idleWave * 0.025
-    local lean = moving and 0.16 or 0.045
-    local roll = math.sin(elapsed * (moving and 4.25 or 0.9)) * (moving and 0.04 or 0.055)
-    local idleRock = moving and 0 or idleWave * 0.035
+    local moveAmount = humanoid.MoveDirection.Magnitude
+    local velocity = root.AssemblyLinearVelocity
+    local horizontalSpeed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
+    local moving = moveAmount > 0.08 and horizontalSpeed > 0.5
 
-    -- A slightly hunched walk, with a slower uneven rock while standing.
-    rootJoint.motor.C0 = rootJoint.base
-      * CFrame.new(0, bob, 0)
-      * CFrame.Angles(lean, 0, roll + idleRock)
+    -- Smoothly blend between the idle pose and the coordinated walking pose.
+    local targetMovementBlend = moving and 1 or 0
+    movementBlend += (targetMovementBlend - movementBlend) * math.clamp(dt * 5, 0, 1)
 
-    local rightShoulder = joints.rightshoulder or joints.rightarm
-    local leftShoulder = joints.leftshoulder or joints.leftarm
-    local rightHip = joints.righthip or joints.rightleg
-    local leftHip = joints.lefthip or joints.leftleg
-
-    local armSwing = moving and wave * 0.42 or math.sin(elapsed * 1.2) * 0.045
-    local legSwing = moving and -wave * 0.34 or math.sin(elapsed * 0.8) * 0.018
-
-    if rightShoulder then
-      rightShoulder.motor.C0 = rightShoulder.base * CFrame.Angles(armSwing - 0.16, 0, -0.12)
-    end
-    if leftShoulder then
-      leftShoulder.motor.C0 = leftShoulder.base * CFrame.Angles(-armSwing - 0.16, 0, 0.12)
-    end
-    if rightHip then
-      rightHip.motor.C0 = rightHip.base * CFrame.Angles(legSwing, 0, 0)
-    end
-    if leftHip then
-      leftHip.motor.C0 = leftHip.base * CFrame.Angles(-legSwing, 0, 0)
+    local gaitRate = math.clamp(horizontalSpeed * 0.85, 4.5, 9.5)
+    if moving then
+      gaitPhase += dt * gaitRate
     end
 
-    -- The head occasionally tilts while idle and turns toward the nearest
-    -- uninfected character when one is around.
+    local stride = math.sin(gaitPhase)
+    local oppositeStride = math.sin(gaitPhase + math.pi)
+    local kneeRight = math.max(0, -stride) * 0.72 * movementBlend
+    local kneeLeft = math.max(0, -oppositeStride) * 0.72 * movementBlend
+
+    local idleBreath = math.sin(elapsed * 1.35)
+    local idleSway = math.sin(elapsed * 0.8 + 0.5)
+    local walkBob = math.abs(math.sin(gaitPhase * 2)) * 0.075 * movementBlend
+    local idleBob = idleBreath * 0.025 * (1 - movementBlend)
+    local bodyBob = walkBob + idleBob
+
+    local bodyLean = 0.13 * movementBlend + 0.035 * (1 - movementBlend)
+    local bodyRoll = math.sin(gaitPhase) * 0.035 * movementBlend
+      + idleSway * 0.045 * (1 - movementBlend)
+    local bodyTwist = math.sin(gaitPhase) * 0.045 * movementBlend
+      + math.sin(elapsed * 0.55) * 0.025 * (1 - movementBlend)
+
+    -- Root and waist work together, instead of the torso staying rigid.
+    apply(rootJoint, CFrame.new(0, bodyBob, 0)
+      * CFrame.Angles(bodyLean, bodyTwist, bodyRoll))
+    apply(waist, CFrame.Angles(
+      -0.045 * movementBlend + idleBreath * 0.018 * (1 - movementBlend),
+      -bodyTwist * 0.65,
+      -bodyRoll * 0.55
+    ))
+
+    -- Both arms swing opposite the legs. The elbows flex as each arm swings
+    -- back, while wrists add a small follow-through so the whole arm connects.
+    local armIdle = math.sin(elapsed * 1.1) * 0.055
+    local rightArmSwing = stride * 0.48 * movementBlend + armIdle * (1 - movementBlend)
+    local leftArmSwing = oppositeStride * 0.48 * movementBlend - armIdle * (1 - movementBlend)
+    local shoulderHunch = -0.17 + 0.035 * math.sin(elapsed * 1.7)
+
+    apply(rightShoulder, CFrame.Angles(shoulderHunch + rightArmSwing, 0, -0.13))
+    apply(leftShoulder, CFrame.Angles(shoulderHunch + leftArmSwing, 0, 0.13))
+
+    apply(rightElbow, CFrame.Angles(
+      0.12 + math.max(0, -stride) * 0.62 * movementBlend
+        + (1 - movementBlend) * (0.12 + math.sin(elapsed * 1.4) * 0.035),
+      0, 0
+    ))
+    apply(leftElbow, CFrame.Angles(
+      0.12 + math.max(0, -oppositeStride) * 0.62 * movementBlend
+        + (1 - movementBlend) * (0.12 + math.sin(elapsed * 1.4 + 1) * 0.035),
+      0, 0
+    ))
+
+    apply(rightWrist, CFrame.Angles(0, 0, math.sin(gaitPhase + 0.5) * 0.08 * movementBlend))
+    apply(leftWrist, CFrame.Angles(0, 0, math.sin(gaitPhase + math.pi + 0.5) * 0.08 * movementBlend))
+
+    -- Hips drive the stride; knees and ankles follow the same gait phase.
+    local legIdle = math.sin(elapsed * 0.75) * 0.025
+    apply(rightHip, CFrame.Angles(
+      oppositeStride * 0.42 * movementBlend + legIdle * (1 - movementBlend), 0, 0
+    ))
+    apply(leftHip, CFrame.Angles(
+      stride * 0.42 * movementBlend - legIdle * (1 - movementBlend), 0, 0
+    ))
+    apply(rightKnee, CFrame.Angles(kneeRight + (1 - movementBlend) * 0.025, 0, 0))
+    apply(leftKnee, CFrame.Angles(kneeLeft + (1 - movementBlend) * 0.025, 0, 0))
+    apply(rightAnkle, CFrame.Angles(-kneeRight * 0.35, 0, 0))
+    apply(leftAnkle, CFrame.Angles(-kneeLeft * 0.35, 0, 0))
+
+    -- The head tracks the nearest uninfected character, then returns to a
+    -- subtle searching motion when no target is nearby.
     if neck then
       if os.clock() >= nextTargetScan then
         targetRoot = findNearestUninfected(character, root.Position)
@@ -360,28 +451,28 @@ local function addProceduralAnimation(character, humanoid, root)
       local desiredYaw = 0
       local desiredPitch = 0
       if targetRoot and targetRoot.Parent then
-        local head = character:FindFirstChild("Head")
-        if head then
-          local offset = root.CFrame:PointToObjectSpace(targetRoot.Position + Vector3.new(0, 1.2, 0))
-          desiredYaw = math.clamp(math.atan2(-offset.X, -offset.Z), -0.65, 0.65)
-          local horizontalDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
-          desiredPitch = math.clamp(math.atan2(offset.Y - 1.2, math.max(horizontalDistance, 0.1)), -0.3, 0.3)
-        end
+        local offset = root.CFrame:PointToObjectSpace(
+          targetRoot.Position + Vector3.new(0, 1.2, 0)
+        )
+        desiredYaw = math.clamp(math.atan2(-offset.X, -offset.Z), -0.65, 0.65)
+        local horizontalDistance = Vector3.new(offset.X, 0, offset.Z).Magnitude
+        desiredPitch = math.clamp(
+          math.atan2(offset.Y - 1.2, math.max(horizontalDistance, 0.1)),
+          -0.3, 0.3
+        )
       else
         desiredYaw = math.sin(elapsed * 0.7) * 0.12
         desiredPitch = math.sin(elapsed * 0.9 + 1) * 0.07
       end
 
-      local blend = math.clamp(dt * 3.5, 0, 1)
-      smoothedHeadYaw += (desiredYaw - smoothedHeadYaw) * blend
-      smoothedHeadPitch += (desiredPitch - smoothedHeadPitch) * blend
+      local headBlend = math.clamp(dt * 3.5, 0, 1)
+      smoothedHeadYaw += (desiredYaw - smoothedHeadYaw) * headBlend
+      smoothedHeadPitch += (desiredPitch - smoothedHeadPitch) * headBlend
       local idleTilt = targetRoot and 0 or math.sin(elapsed * 0.65) * 0.045
-      neck.motor.C0 = neck.base
-        * CFrame.Angles(smoothedHeadPitch, smoothedHeadYaw, idleTilt)
+      apply(neck, CFrame.Angles(smoothedHeadPitch, smoothedHeadYaw, idleTilt))
     end
   end)
 end
-
 local function transformCharacter(character, player)
   if not character or not character.Parent or character:GetAttribute("IsInfected") then
     return
