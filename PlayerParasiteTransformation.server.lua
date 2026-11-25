@@ -215,20 +215,33 @@ local function makeBackTendril(character, root)
 end
 
 local function addProceduralAnimation(character, humanoid, root)
-  local rootJoint = nil
+  local animateScript = character:FindFirstChild("Animate")
+  if animateScript and animateScript:IsA("LocalScript") then
+    animateScript.Disabled = true
+  end
+
+  local joints = {}
   for _, item in ipairs(character:GetDescendants()) do
-    if item:IsA("Motor6D") and (item.Name == "RootJoint" or item.Name == "Root") then
-      rootJoint = item
-      break
+    if item:IsA("Motor6D") then
+      local key = string.lower(item.Name):gsub("[%s_]", "")
+      if key == "root" or key == "rootjoint"
+        or key == "rightshoulder" or key == "leftshoulder"
+        or key == "rightarm" or key == "leftarm"
+        or key == "righthip" or key == "lefthip"
+        or key == "rightleg" or key == "leftleg"
+        or key == "waist" then
+        joints[key] = {motor = item, base = item.C0}
+      end
     end
   end
+
+  local rootJoint = joints.rootjoint or joints.root or joints.waist
   if not rootJoint then return end
 
-  local baseC0 = rootJoint.C0
   local startTime = os.clock()
   local connection
   connection = RunService.Heartbeat:Connect(function()
-    if not character.Parent or humanoid.Health <= 0 or not rootJoint.Parent then
+    if not character.Parent or humanoid.Health <= 0 or not rootJoint.motor.Parent then
       connection:Disconnect()
       return
     end
@@ -236,13 +249,35 @@ local function addProceduralAnimation(character, humanoid, root)
     local elapsed = os.clock() - startTime
     local moving = humanoid.MoveDirection.Magnitude > 0.08
     local speed = moving and 8.5 or 2.1
-    local bob = math.sin(elapsed * speed) * (moving and 0.075 or 0.025)
-    local lean = moving and 0.12 or 0.035
-    local roll = math.sin(elapsed * (moving and 4.25 or 1.05)) * 0.035
+    local wave = math.sin(elapsed * speed)
+    local bob = wave * (moving and 0.07 or 0.025)
+    local lean = moving and 0.13 or 0.035
+    local roll = math.sin(elapsed * (moving and 4.25 or 1.05)) * 0.04
 
-    rootJoint.C0 = baseC0
+    rootJoint.motor.C0 = rootJoint.base
       * CFrame.new(0, bob, 0)
       * CFrame.Angles(lean, 0, roll)
+
+    local rightShoulder = joints.rightshoulder or joints.rightarm
+    local leftShoulder = joints.leftshoulder or joints.leftarm
+    local rightHip = joints.righthip or joints.rightleg
+    local leftHip = joints.lefthip or joints.leftleg
+
+    local armSwing = moving and wave * 0.42 or math.sin(elapsed * 1.2) * 0.045
+    local legSwing = moving and -wave * 0.34 or 0.015
+
+    if rightShoulder then
+      rightShoulder.motor.C0 = rightShoulder.base * CFrame.Angles(armSwing - 0.16, 0, -0.12)
+    end
+    if leftShoulder then
+      leftShoulder.motor.C0 = leftShoulder.base * CFrame.Angles(-armSwing - 0.16, 0, 0.12)
+    end
+    if rightHip then
+      rightHip.motor.C0 = rightHip.base * CFrame.Angles(legSwing, 0, 0)
+    end
+    if leftHip then
+      leftHip.motor.C0 = leftHip.base * CFrame.Angles(-legSwing, 0, 0)
+    end
   end)
 end
 
