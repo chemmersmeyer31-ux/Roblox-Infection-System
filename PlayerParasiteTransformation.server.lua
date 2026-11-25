@@ -233,7 +233,11 @@ local function makeBackTendril(character, root)
     if direction.Magnitude > 0.05 then direction = direction.Unit end
     currentExtension += (desiredExtension - currentExtension) * math.clamp(dt * 2.6, 0, 1)
     phase += dt * 2.0
-    local sway = math.sin(phase) * 0.09
+    local hasTarget = targetRoot ~= nil and targetRoot.Parent ~= nil
+    -- Gently search when no enemy is being tracked; fade this motion out
+    -- when a target appears so the tendril can aim cleanly.
+    local idleAmount = hasTarget and 0 or 1
+    local sway = math.sin(phase * 0.75) * (0.08 + idleAmount * 0.16)
 
     local right = torso.CFrame.RightVector
     for index, item in ipairs(roots) do
@@ -255,9 +259,13 @@ local function makeBackTendril(character, root)
       local sideSweep = math.sin(t * math.pi) * 1.5
       local forwardReach = visibleExtension * bend
       local shoulderLift = math.sin(t * math.pi) * 0.28
+      -- With no target, the raised tip slowly sways and reaches slightly
+      -- forward/back, like the parasite is quietly searching for movement.
+      local idleSideSearch = math.sin(phase * 0.75) * 0.42 * idleAmount * bend
+      local idleForwardSearch = math.sin(phase * 0.55 + 0.8) * 0.28 * idleAmount * bend
       return origin
-        + sideDirection * sideSweep
-        + direction * forwardReach
+        + sideDirection * (sideSweep + idleSideSearch)
+        + direction * (forwardReach + idleForwardSearch)
         + Vector3.new(0, stemHeight * t + shoulderLift, 0)
     end
 
