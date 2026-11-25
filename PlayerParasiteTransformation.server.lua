@@ -207,7 +207,15 @@ local function makeBackTendril(character, root)
       local radius = 0.72 - alpha * 0.43
       local length = TENDRIL_LENGTH / TENDRIL_SEGMENTS * 1.55
       part.Size = Vector3.new(length, radius * 2, radius * 2)
-      part.CFrame = CFrame.lookAt(position, position + tangent.Unit)
+      local axis = tangent.Unit
+      local up = Vector3.yAxis - axis * axis.Y
+      if up.Magnitude < 0.05 then
+        up = Vector3.zAxis - axis * axis.Z
+      end
+      up = up.Unit
+      local sideAxis = axis:Cross(up).Unit
+      up = sideAxis:Cross(axis).Unit
+      part.CFrame = CFrame.fromMatrix(position, axis, up, sideAxis)
     end
   end)
 
