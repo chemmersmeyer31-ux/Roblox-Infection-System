@@ -209,17 +209,21 @@ local function makeBackTendril(character, root)
     end
 
     local desiredDirection = root.CFrame.LookVector
-    local desiredExtension = 1.0
+    local desiredExtension = 2.2
     if targetRoot and targetRoot.Parent then
-      local offset = targetRoot.Position - origin
-      local horizontal = Vector3.new(offset.X, 0, offset.Z)
-      if horizontal.Magnitude > 0.05 then
-        -- The tendril turns around its back attachment to face the target.
-        desiredDirection = horizontal.Unit
-        local proximity = 1 - math.clamp(offset.Magnitude / 35, 0, 1)
-        -- It stays compact at range, then reaches farther as the target approaches.
-        desiredExtension = 1.0 + proximity * 2.5
+      -- Aim from a point above the infected player's head so the raised tip
+      -- points toward the enemy instead of simply facing horizontally.
+      local elevatedAimOrigin = origin + Vector3.new(0, 4.65, 0)
+      local enemyAimPoint = targetRoot.Position + Vector3.new(0, 1.5, 0)
+      local aimOffset = enemyAimPoint - elevatedAimOrigin
+      if aimOffset.Magnitude > 0.05 then
+        desiredDirection = aimOffset.Unit
       end
+
+      local distance = (targetRoot.Position - origin).Magnitude
+      local proximity = 1 - math.clamp(distance / 35, 0, 1)
+      -- Give the tendril a longer reach, especially as the enemy gets close.
+      desiredExtension = 2.2 + proximity * 4.0
     end
 
     direction = direction:Lerp(desiredDirection, math.clamp(dt * 4.5, 0, 1))
@@ -238,16 +242,15 @@ local function makeBackTendril(character, root)
       setGroundVineSegment(item.motor, torso, startPoint, endPoint, direction, 0.105)
     end
 
-    -- A fuller, taller reach: the tendril rises to shoulder height,
-    -- sweeps around the nearest side of the infected character, then reaches
-    -- toward the target. Extension increases as the target gets close.
+    -- The tendril rises above the head, sweeps farther around the shoulder/side,
+    -- then angles its tip toward the enemy from that elevated position.
     local stemHeight = 4.65
     local visibleExtension = currentExtension + sway
     local sideSign = direction:Dot(torso.CFrame.RightVector) >= 0 and 1 or -1
     local sideDirection = torso.CFrame.RightVector * sideSign
     local function pathPoint(t)
       local bend = t * t
-      local sideSweep = math.sin(t * math.pi) * 1.05
+      local sideSweep = math.sin(t * math.pi) * 1.5
       local forwardReach = visibleExtension * bend
       local shoulderLift = math.sin(t * math.pi) * 0.28
       return origin
